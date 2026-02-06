@@ -210,10 +210,16 @@ class TempestWeatherStation extends IPSModule
         if (strpos($name, '~') === 0) return;
         if (!IPS_VariableProfileExists($name)) IPS_CreateVariableProfile($name, $type);
         IPS_SetVariableProfileText($name, $prefix, $suffix);
-        IPS_SetVariableProfileDigits($name, $digits);
-        IPS_SetVariableProfileValues($name, $min, $max, $step);
-        if ($associations) {
-            foreach ($associations['Text'] as $key => $text) IPS_SetVariableProfileAssociation($name, (float)$key, $text, '', $associations['Color'][$key] ?? -1);
+
+        if ($type == 1 || $type == 2) { // Only for Integer (1) and Float (2)
+            IPS_SetVariableProfileDigits($name, $digits);
+            IPS_SetVariableProfileValues($name, $min, $max, $step);
+        }
+
+        if ($type != 3 && $associations) { // String (3) does not support associations
+            foreach ($associations['Text'] as $key => $text) {
+                IPS_SetVariableProfileAssociation($name, (float)$key, $text, '', $associations['Color'][$key] ?? -1);
+            }
         }
     }
 }
