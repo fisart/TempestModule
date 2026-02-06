@@ -1,22 +1,17 @@
 {
-    "id": "{42B7D65F-F936-9CDC-BDBA-66684A8E1CDB}",
+    "id": "{FC25E9B8-9281-8A17-15BF-A1CD0C7CCB70}",
     "name": "Tempest Weather Station",
-    "url": "https://github.com/fisart/TempestModule/blob/main/README.md",
     "type": 3,
     "vendor": "Weatherflow",
     "aliases": [
+        "Tempest"
     ],
     "parentRequirements": [
-        "{8E4D9B23-E0F2-1E05-41D8-C21EA53B8706}",
-        "{C8792760-65CF-4C53-B5C7-A30FCC84FEFE}",
-        "{79827379-F36E-4ADA-8A95-5F8D1DC92FA9}"
+        "{82348112-C10E-4150-A5C5-D31E9765174A}"
     ],
-    "childRequirements": [
-    ],
+    "childRequirements": [],
     "implemented": [
-        "{9082C662-7864-D5CA-863F-53999200D897}",
-        "{7A1272A4-CBDB-46EF-BFC6-DCF4A53D2FC7}",
-        "{018EF6B5-AB94-40C6-AA53-46943E824ACF}"
+        "{C62A8550-A1D8-4C3D-B947-66914594A790}"
     ],
     "prefix": "TMT"
 }

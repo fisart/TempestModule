@@ -2,125 +2,218 @@
 
 declare(strict_types=1);
 
-// CLASS TempestWeather Station
-class TempestWeather Station extends IPSModuleStrict
-{
+require_once __DIR__ . '/../libs/RegressionHelper.php';
 
-    /**
-     * In contrast to Construct, this function is called only once when creating the instance and starting IP-Symcon.
-     * Therefore, status variables and module properties which the module requires permanently should be created here.
-     *
-     * @return void
-     */
-    public function Create(): void
+/**
+ * TempestWeatherStation Class
+ * Handles data from Weatherflow Tempest via UDP.
+ */
+class TempestWeatherStation extends IPSModule
+{
+    use \MachineLearning\Regression\RegressionHelper;
+
+    public function Create()
     {
-        //Never delete this line!
         parent::Create();
 
-        if ((float) IPS_GetKernelVersion() < 8.2) {
-            $this->RequireParent('{82347F20-F541-41E1-AC5B-A636FD3AE2D8}');
-        }
+        // Register Properties from form.json
+        $this->RegisterPropertyString('ProfilePrefix', 'Tempest_');
+        $this->RegisterPropertyBoolean('ExperimentalRegression', true);
+        $this->RegisterPropertyString('TriggerValueSlope', '0.000004');
+        $this->RegisterPropertyInteger('RegressionDataPoints', 45);
 
-        // Set visualization type to 1, as we want to offer HTML
-        $this->SetVisualizationType(1);
+        // Message Type Toggles
+        $this->RegisterPropertyBoolean('MsgObsSt', true);
+        $this->RegisterPropertyBoolean('MsgDeviceStatus', true);
+        $this->RegisterPropertyBoolean('MsgHubStatus', true);
+        $this->RegisterPropertyBoolean('MsgRapidWind', true);
+        $this->RegisterPropertyBoolean('MsgPrecip', true);
+        $this->RegisterPropertyBoolean('MsgStrike', true);
     }
 
-    /**
-     * This function is called when deleting the instance during operation and when updating via "Module Control".
-     * The function is not called when exiting IP-Symcon.
-     *
-     * @return void
-     */
-    public function Destroy(): void
-    {
-        parent::Destroy();
-    }
-
-    /**
-     * The function returns a JSON-encoded object that describes compatible parent instances. 
-     * The management console uses this information to suggest suitable parent instances
-     * when creating or customising the instance.
-     *
-     * @return string JSON-encoded object
-     */
-    public function GetCompatibleParents(): string
-    {
-        // return '{"type": "require", "moduleIDs": ["{12345678-1234-5678-ABCDEFABCDEF}"]}';
-        // return '{"type": "connect", "moduleIDs": ["{12345678-1234-5678-ABCDEFABCDEF}"]}';
-        return $this->module->GetConfigurationForParent();
-    }
-
-    /**
-     * Is executed when "Apply" is pressed on the configuration page and immediately after the instance has been created.
-     *
-     * @return void
-     */
-    public function ApplyChanges(): void
+    public function ApplyChanges()
     {
         parent::ApplyChanges();
-
-        // Set status
-        $this->SetStatus(102);
+        $this->UpdateProfiles();
     }
 
-    /**
-     * This function sends the text message to all of his children.
-     *
-     * @param string $text Text message
-     *
-     * @return void
-     */
-    public function Send(string $Text, string $Text, string $ClientIP, int $ClientPort): void
+    public function ReceiveData($JSONString)
     {
-        $this->SendDataToParent(json_encode(['DataID' => '{8E4D9B23-E0F2-1E05-41D8-C21EA53B8706},{C8792760-65CF-4C53-B5C7-A30FCC84FEFE},{79827379-F36E-4ADA-8A95-5F8D1DC92FA9}', "ClientIP" => $ClientIP, "ClientPort" => $ClientPort, "Buffer" => $Text]));
+        $data = json_decode($JSONString, true);
+        if (!$data) return;
+
+        $payload = json_decode($data['Buffer'], true);
+        if (!$payload || !isset($payload['type'])) return;
+
+        $this->SendDebug('ReceiveData', $data['Buffer'], 0);
+
+        switch ($payload['type']) {
+            case 'obs_st':
+                if ($this->ReadPropertyBoolean('MsgObsSt')) $this->ProcessObservation($payload);
+                break;
+            case 'device_status':
+                if ($this->ReadPropertyBoolean('MsgDeviceStatus')) $this->ProcessDeviceStatus($payload);
+                break;
+            case 'hub_status':
+                if ($this->ReadPropertyBoolean('MsgHubStatus')) $this->ProcessHubStatus($payload);
+                break;
+            case 'rapid_wind':
+                if ($this->ReadPropertyBoolean('MsgRapidWind')) $this->ProcessRapidWind($payload);
+                break;
+            case 'evt_precip':
+                if ($this->ReadPropertyBoolean('MsgPrecip')) $this->ProcessPrecip($payload);
+                break;
+            case 'evt_strike':
+                if ($this->ReadPropertyBoolean('MsgStrike')) $this->ProcessStrike($payload);
+                break;
+        }
     }
 
-    /**
-     * This function is called by IP-Symcon and processes sent data and, if necessary, forwards it to
-     * all child instances. Data can be sent using the SendDataToChildren function.
-     *
-     * @param string $json Data package in JSON format
-     *
-     * @return string Optional response to the parent instance
-     */
-    public function ReceiveData(string $json): string
+    private function ProcessObservation(array $data)
     {
-        $data = json_decode($json);
-        IPS_LogMessage('Device RECV', utf8_decode($data->Buffer . ' - ' . $data->ClientIP . ' - ' . $data->ClientPort));
+        $obs = $data['obs'][0];
+        $timestamp = $obs[0];
+
+        if ($obs[7] == 0 && $obs[8] == 0) {
+            $this->LogMessage('Tempest: Corrupt data received (0 Temp/Hum), skipping.', 10206);
+            return;
+        }
+
+        $check = $this->CheckTimestamp('Time_Epoch', $timestamp);
+        if ($check === 'INVALID') return;
+
+        $config = $this->GetModuleConfig();
+        $prefix = $this->ReadPropertyString('ProfilePrefix');
+
+        foreach ($config['descriptions']['obs_st'] as $index => $name) {
+            $val = $obs[$index];
+            $ident = str_replace([' ', '(', ')'], ['_', '', ''], $name);
+
+            if (strpos($name, 'Wind') !== false && $name != 'Wind Direction') {
+                $val = $val * 3.6;
+            }
+
+            $this->MaintainVariable($ident, $name, 2, $prefix . $this->GetProfileForName($name), $index, true);
+            $this->HandleValueUpdate($ident, $val, $timestamp, $check);
+        }
+
+        if ($this->ReadPropertyBoolean('ExperimentalRegression')) {
+            $this->UpdateBatteryLogic($obs[16]);
+        }
     }
 
-
-
-    /**
-     * If the HTML-SDK is to be used, this function must be overwritten in order to return the HTML content.
-     *
-     * @return string Initial display of a representation via HTML SDK
-     */
-    public function GetVisualizationTile(): string
+    private function UpdateBatteryLogic(float $currentVoltage)
     {
-        // Add a script to set the values when loading, analogous to changes at runtime
-        // Although the return from GetFullUpdateMessage is already JSON-encoded, json_encode is still executed a second time
-        // This adds quotation marks to the string and any quotation marks within it are escaped correctly
-        $handling = '<script>handleMessage(' . json_encode($this->GetFullUpdateMessage()) . ');</script>';
-        // Add static HTML from file
-        $module = file_get_contents(__DIR__ . '/module.html');
-        // Important: $initialHandling at the end, as the handleMessage function is only defined in the HTML
-        return $module . $handling;
+        $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
+        $nrPoints = $this->ReadPropertyInteger('RegressionDataPoints');
+        $triggerSlope = (float)$this->ReadPropertyString('TriggerValueSlope');
+        $prefix = $this->ReadPropertyString('ProfilePrefix');
+
+        $batteryID = @$this->GetIDForIdent('Battery');
+        if (!$batteryID) return;
+
+        $history = AC_GetLoggedValues($archiveID, $batteryID, time() - 86400, time(), $nrPoints);
+        if (count($history) < 5) return;
+
+        $x = [];
+        $y = [];
+        foreach ($history as $row) {
+            $x[] = $row['TimeStamp'];
+            $y[] = $row['Value'];
+        }
+
+        $regression = new \MachineLearning\Regression\LeastSquares();
+        $regression->train($x, $y);
+        $slope = $regression->getSlope();
+
+        $statusID = $this->MaintainVariable('Battery_Status', 'Battery Status', 0, $prefix . 'battery_status', 23, true);
+        $slopeID = $this->MaintainVariable('Slope', 'Regression Slope', 2, $prefix . 'slope', 22, true);
+
+        $oldSlope = GetValue($slopeID);
+        $isCharging = GetValue($statusID);
+
+        $newState = $isCharging ? ($slope >= $triggerSlope && $slope >= $oldSlope) : ($slope >= $triggerSlope && $slope > $oldSlope);
+
+        SetValue($this->MaintainVariable('Average', 'Average Voltage', 2, $prefix . 'volt', 20, true), $this->calculate_average($y));
+        SetValue($slopeID, $slope);
+        SetValue($statusID, $newState);
     }
 
-    /**
-     * Generate a message that updates all elements in the HTML display.
-     *
-     * @return string JSON encoded message information
-     */
-    private function GetFullUpdateMessage(): string
+    private function CheckTimestamp(string $ident, int $timestamp)
     {
-        // Fill resultset
-        $result = [];
-        $result['text'] = "Here's the text!";
-        $result['bgcolor'] = $this->ReadPropertyInteger('PriceFont');
-        $this->SendDebug(__FUNCTION__, print_r($result, true), 0);
-        // send it
-        return json_encode($result);
+        $varID = @$this->GetIDForIdent($ident);
+        if (!$varID) return 'NEW_VALUE';
+
+        $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
+        if (!AC_GetLoggingStatus($archiveID, $varID)) return 'NEW_VALUE';
+
+        if ($timestamp > time()) return 'INVALID';
+
+        $lastValues = AC_GetLoggedValues($archiveID, $varID, $timestamp - 1, $timestamp + 1, 1);
+        if (!empty($lastValues) && $lastValues[0]['Value'] == $timestamp) return 'INVALID';
+
+        return ($timestamp < IPS_GetVariable($varID)['VariableUpdated']) ? 'OLD_TIME_STAMP' : 'NEW_VALUE';
+    }
+
+    private function HandleValueUpdate(string $ident, $value, int $timestamp, string $check)
+    {
+        $varID = $this->GetIDForIdent($ident);
+        if ($check === 'OLD_TIME_STAMP') {
+            $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
+            AC_AddLoggedValues($archiveID, $varID, [['TimeStamp' => $timestamp, 'Value' => $value]]);
+            AC_ReAggregateVariable($archiveID, $varID);
+        } else {
+            SetValue($varID, $value);
+        }
+    }
+
+    public function UpdateProfiles()
+    {
+        $prefix = $this->ReadPropertyString('ProfilePrefix');
+        $config = $this->GetModuleConfig();
+
+        foreach ($config['profiles'] as $name => $p) {
+            $this->RegisterProfile($prefix . $name, $p['type'], $p['digits'], $p['prefix'], $p['suffix'], $p['min'], $p['max'], $p['step'], $p['associations'] ?? null);
+        }
+    }
+
+    private function GetModuleConfig()
+    {
+        $green = 0x006400;
+        $red = 0xFF0000;
+        $blue = 0x0000FF;
+        $yellow = 0xCBCF00;
+        $purple = 0x800080;
+        $orange = 0xFFA500;
+        return [
+            'descriptions' => [
+                'obs_st' => [0 => 'Time Epoch', 1 => 'Wind Lull', 2 => 'Wind Avg', 3 => 'Wind Gust', 4 => 'Wind Direction', 7 => 'Air Temperature', 8 => 'Relative Humidity', 16 => 'Battery']
+            ],
+            'profiles' => [
+                'km_pro_stunde' => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' km/h', 'min' => 0, 'max' => 160, 'step' => 0.01],
+                'celcius' => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' °C', 'min' => -40, 'max' => 45, 'step' => 0.01],
+                'volt' => ['type' => 2, 'digits' => 3, 'prefix' => '', 'suffix' => ' V', 'min' => 0, 'max' => 4, 'step' => 0.001],
+                'battery_status' => ['type' => 0, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 1, 'step' => 0, 'associations' => ['Text' => [false => 'Discharge', true => 'Charge'], 'Color' => [false => $red, true => $green]]],
+                'text' => ['type' => 3, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 0, 'step' => 0]
+            ]
+        ];
+    }
+
+    private function GetProfileForName(string $name)
+    {
+        $mapping = ['Air Temperature' => 'celcius', 'Relative Humidity' => 'percent', 'Wind Avg' => 'km_pro_stunde', 'Battery' => 'volt'];
+        return $mapping[$name] ?? 'text';
+    }
+
+    private function RegisterProfile($name, $type, $digits, $prefix, $suffix, $min, $max, $step, $associations)
+    {
+        if (strpos($name, '~') === 0) return;
+        if (!IPS_VariableProfileExists($name)) IPS_CreateVariableProfile($name, $type);
+        IPS_SetVariableProfileText($name, $prefix, $suffix);
+        IPS_SetVariableProfileDigits($name, $digits);
+        IPS_SetVariableProfileValues($name, $min, $max, $step);
+        if ($associations) {
+            foreach ($associations['Text'] as $key => $text) IPS_SetVariableProfileAssociation($name, (float)$key, $text, '', $associations['Color'][$key] ?? -1);
+        }
     }
 }

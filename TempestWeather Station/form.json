@@ -1,28 +1,25 @@
 {
     "elements": [
+        { "type": "ExpansionPanel", "caption": "General Settings", "items": [
+            { "type": "ValidationTextField", "name": "ProfilePrefix", "caption": "Profile Prefix", "value": "Tempest_" }
+        ]},
+        { "type": "ExpansionPanel", "caption": "Battery Regression (Experimental)", "items": [
+            { "type": "CheckBox", "name": "ExperimentalRegression", "caption": "Enable Battery Hysteresis Logic", "value": true },
+            { "type": "ValidationTextField", "name": "TriggerValueSlope", "caption": "Trigger Value Slope (m)", "value": "0.000004" },
+            { "type": "NumberSpinner", "name": "RegressionDataPoints", "caption": "Number of Datapoints", "value": 45, "minimum": 5, "maximum": 500 }
+        ]},
+        { "type": "ExpansionPanel", "caption": "Variable Selection", "items": [
+            { "type": "Label", "caption": "Select message types to process and create variables for:" },
+            { "type": "CheckBox", "name": "MsgObsSt", "caption": "Observations (obs_st)", "value": true },
+            { "type": "CheckBox", "name": "MsgDeviceStatus", "caption": "Device Status (device_status)", "value": true },
+            { "type": "CheckBox", "name": "MsgHubStatus", "caption": "Hub Status (hub_status)", "value": true },
+            { "type": "CheckBox", "name": "MsgRapidWind", "caption": "Rapid Wind (rapid_wind)", "value": true },
+            { "type": "CheckBox", "name": "MsgPrecip", "caption": "Precipitation Events (evt_precip)", "value": true },
+            { "type": "CheckBox", "name": "MsgStrike", "caption": "Lightning Strikes (evt_strike)", "value": true }
+        ]}
     ],
     "actions": [
-        { 
-            "name": "ClientIP",
-            "type": "ValidationTextBox",
-            "caption": "Client IP"
-        },
-        {
-            "name": "ClientPort",
-            "type": "NumberSpinner",
-            "caption": "Client Port"
-        },
-        {
-            "name": "Text",
-            "type": "ValidationTextBox",
-            "caption": "Text" 
-        },
-        {
-            "type": "Button",
-            "caption": "Send",
-            "onClick": TMT_Send($id, $Text, $ClientIP, $ClientPort);"
-        }
-    ],
-    "status": [
+        { "type": "Button", "label": "Update Profiles Now", "onClick": "TMT_UpdateProfiles($id);" },
+        { "type": "Label", "caption": "Note: Profiles are also automatically updated when you click 'Apply'." }
     ]
 }
