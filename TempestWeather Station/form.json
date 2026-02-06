@@ -1,21 +1,21 @@
 {
     "elements": [
         { "type": "ExpansionPanel", "caption": "General Settings", "items": [
-            { "type": "ValidationInput", "name": "ProfilePrefix", "caption": "Profile Prefix", "value": "Tempest_" }
+            { "type": "ValidationTextField", "name": "ProfilePrefix", "caption": "Profile Prefix" }
         ]},
         { "type": "ExpansionPanel", "caption": "Battery Regression (Experimental)", "items": [
-            { "type": "CheckBox", "name": "ExperimentalRegression", "caption": "Enable Battery Hysteresis Logic", "value": true },
-            { "type": "ValidationInput", "name": "TriggerValueSlope", "caption": "Trigger Value Slope (m)", "value": "0.000004" },
-            { "type": "NumberSpinner", "name": "RegressionDataPoints", "caption": "Number of Datapoints", "value": 45, "minimum": 5, "maximum": 500 }
+            { "type": "CheckBox", "name": "ExperimentalRegression", "caption": "Enable Battery Hysteresis Logic" },
+            { "type": "NumberSpinner", "name": "TriggerValueSlope", "caption": "Trigger Value Slope (m)", "digits": 6 },
+            { "type": "NumberSpinner", "name": "RegressionDataPoints", "caption": "Number of Datapoints", "minimum": 5, "maximum": 500 }
         ]},
         { "type": "ExpansionPanel", "caption": "Variable Selection", "items": [
             { "type": "Label", "caption": "Select message types to process and create variables for:" },
-            { "type": "CheckBox", "name": "MsgObsSt", "caption": "Observations (obs_st)", "value": true },
-            { "type": "CheckBox", "name": "MsgDeviceStatus", "caption": "Device Status (device_status)", "value": true },
-            { "type": "CheckBox", "name": "MsgHubStatus", "caption": "Hub Status (hub_status)", "value": true },
-            { "type": "CheckBox", "name": "MsgRapidWind", "caption": "Rapid Wind (rapid_wind)", "value": true },
-            { "type": "CheckBox", "name": "MsgPrecip", "caption": "Precipitation Events (evt_precip)", "value": true },
-            { "type": "CheckBox", "name": "MsgStrike", "caption": "Lightning Strikes (evt_strike)", "value": true }
+            { "type": "CheckBox", "name": "MsgObsSt", "caption": "Observations (obs_st)" },
+            { "type": "CheckBox", "name": "MsgDeviceStatus", "caption": "Device Status (device_status)" },
+            { "type": "CheckBox", "name": "MsgHubStatus", "caption": "Hub Status (hub_status)" },
+            { "type": "CheckBox", "name": "MsgRapidWind", "caption": "Rapid Wind (rapid_wind)" },
+            { "type": "CheckBox", "name": "MsgPrecip", "caption": "Precipitation Events (evt_precip)" },
+            { "type": "CheckBox", "name": "MsgStrike", "caption": "Lightning Strikes (evt_strike)" }
         ]}
     ],
     "actions": [
