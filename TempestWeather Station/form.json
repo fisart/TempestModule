@@ -16,6 +16,9 @@
             { "type": "CheckBox", "name": "MsgRapidWind", "caption": "Rapid Wind (rapid_wind)" },
             { "type": "CheckBox", "name": "MsgPrecip", "caption": "Precipitation Events (evt_precip)" },
             { "type": "CheckBox", "name": "MsgStrike", "caption": "Lightning Strikes (evt_strike)" }
+        ]},
+        { "type": "ExpansionPanel", "caption": "Visualization", "items": [
+            { "type": "CheckBox", "name": "EnableHTML", "caption": "Enable HTML Dashboard" }
         ]}
     ],
     "actions": [

@@ -29,6 +29,9 @@ class TempestWeatherStation extends IPSModule
         $this->RegisterPropertyBoolean('MsgRapidWind', true);
         $this->RegisterPropertyBoolean('MsgPrecip', true);
         $this->RegisterPropertyBoolean('MsgStrike', true);
+
+        $this->RegisterPropertyBoolean('EnableHTML', true);
+        $this->RegisterVariableString('Dashboard', 'Dashboard', '~HTMLBox', 150);
     }
 
     public function ApplyChanges()
@@ -67,6 +70,7 @@ class TempestWeatherStation extends IPSModule
                 if ($this->ReadPropertyBoolean('MsgStrike')) $this->ProcessStrike($payload);
                 break;
         }
+        $this->GenerateHTMLDashboard();
     }
 
     private function ProcessObservation(array $data)
@@ -165,6 +169,31 @@ class TempestWeatherStation extends IPSModule
         } else {
             SetValue($varID, $value);
         }
+    }
+    private function GenerateHTMLDashboard()
+    {
+        if (!$this->ReadPropertyBoolean('EnableHTML')) return;
+
+        $temp = @GetValue($this->GetIDForIdent('Air_Temperature')) ?? '--';
+        $hum  = @GetValue($this->GetIDForIdent('Relative_Humidity')) ?? '--';
+        $wind = @GetValue($this->GetIDForIdent('Wind_Avg')) ?? '--';
+        $batt = @GetValue($this->GetIDForIdent('Battery')) ?? '--';
+        $state = @GetValue($this->GetIDForIdent('Battery_Status')) ? 'Charging' : 'Discharging';
+
+        $html = "
+        <div style='font-family:sans-serif; padding:10px; border-radius:10px; background-color:rgba(0,0,0,0.1);'>
+            <h3 style='margin:0 0 10px 0;'>Tempest Station Status</h3>
+            <div style='display:flex; justify-content:space-between;'>
+                <div><b>Temp:</b> $temp °C</div>
+                <div><b>Humidity:</b> $hum %</div>
+            </div>
+            <div style='display:flex; justify-content:space-between; margin-top:5px;'>
+                <div><b>Wind:</b> $wind km/h</div>
+                <div><b>Battery:</b> $batt V ($state)</div>
+            </div>
+        </div>";
+
+        $this->SetValue('Dashboard', $html);
     }
 
     public function UpdateProfiles()
