@@ -185,16 +185,49 @@ class TempestWeatherStation extends IPSModule
         $yellow = 0xCBCF00;
         $purple = 0x800080;
         $orange = 0xFFA500;
+
         return [
             'descriptions' => [
-                'obs_st' => [0 => 'Time Epoch', 1 => 'Wind Lull', 2 => 'Wind Avg', 3 => 'Wind Gust', 4 => 'Wind Direction', 7 => 'Air Temperature', 8 => 'Relative Humidity', 16 => 'Battery']
+                'obs_st' => [
+                    0 => 'Time Epoch',
+                    1 => 'Wind Lull',
+                    2 => 'Wind Avg',
+                    3 => 'Wind Gust',
+                    4 => 'Wind Direction',
+                    7 => 'Air Temperature',
+                    8 => 'Relative Humidity',
+                    11 => 'Solar Radiation',
+                    12 => 'Precip Accumulated',
+                    16 => 'Battery'
+                ],
+                'device_status' => [4 => 'uptime', 5 => 'voltage', 7 => 'rssi', 8 => 'hub_rssi', 9 => 'sensor_status'],
+                'hub_status' => [3 => 'uptime', 4 => 'rssi', 9 => 'radio_stats'],
+                'radio_stats' => [1 => 'Reboot Count', 2 => 'I2C Bus Error Count', 3 => 'Radio Status']
             ],
             'profiles' => [
-                'km_pro_stunde' => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' km/h', 'min' => 0, 'max' => 160, 'step' => 0.01],
-                'celcius' => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' °C', 'min' => -40, 'max' => 45, 'step' => 0.01],
-                'volt' => ['type' => 2, 'digits' => 3, 'prefix' => '', 'suffix' => ' V', 'min' => 0, 'max' => 4, 'step' => 0.001],
-                'battery_status' => ['type' => 0, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 1, 'step' => 0, 'associations' => ['Text' => [false => 'Discharge', true => 'Charge'], 'Color' => [false => $red, true => $green]]],
-                'text' => ['type' => 3, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 0, 'step' => 0]
+                'km_pro_stunde'    => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' km/h', 'min' => 0, 'max' => 160, 'step' => 0.01],
+                'celcius'          => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' °C', 'min' => -40, 'max' => 45, 'step' => 0.01],
+                'volt'             => ['type' => 2, 'digits' => 3, 'prefix' => '', 'suffix' => ' V', 'min' => 0, 'max' => 4, 'step' => 0.001],
+                'percent'          => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' %', 'min' => 0, 'max' => 100, 'step' => 0.01],
+                'milli_bar'        => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' hPa', 'min' => 0, 'max' => 9999, 'step' => 1],
+                'wind_direction'   => ['type' => 2, 'digits' => 1, 'prefix' => '', 'suffix' => ' °', 'min' => 0, 'max' => 360, 'step' => 1],
+                'energy'           => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' W/m²', 'min' => 0, 'max' => 1000, 'step' => 1],
+                'km'               => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' km', 'min' => 0, 'max' => 100, 'step' => 0.01],
+                'rssi'             => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' dB', 'min' => -100, 'max' => 0, 'step' => 1],
+                'seconds'          => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' s', 'min' => 0, 'max' => 999999999, 'step' => 1],
+                '~UnixTimestamp'   => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 999999999, 'step' => 1],
+                'slope'            => ['type' => 2, 'digits' => 9, 'prefix' => '', 'suffix' => ' mx+b', 'min' => -10, 'max' => 10, 'step' => 0.00000001],
+                'battery_status'   => ['type' => 0, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 1, 'step' => 0, 'associations' => ['Text' => [false => 'Discharge', true => 'Charge'], 'Color' => [false => $red, true => $green]]],
+                'system_condition' => ['type' => 2, 'digits' => 3, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 3, 'step' => 0.001, 'associations' => null],
+                'text'             => ['type' => 3, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 0, 'step' => 0]
+            ],
+            'charge' => [
+                'Text' => [0 => ' + Hibernate', 4 => ' + Wind 1m', 6 => ' + Wind 6s', 8 => ' + Full Perf'],
+                'Color' => [0 => $purple, 4 => $orange, 6 => $yellow, 8 => $green]
+            ],
+            'discharge' => [
+                'Text' => [0 => ' - Hibernate', 4 => ' - Wind 1m', 6 => ' - Wind 6s', 8 => ' - Full Perf'],
+                'Color' => [0 => $purple, 4 => $orange, 6 => $yellow, 8 => $green]
             ]
         ];
     }
@@ -221,5 +254,88 @@ class TempestWeatherStation extends IPSModule
                 IPS_SetVariableProfileAssociation($name, (float)$key, $text, '', $associations['Color'][$key] ?? -1);
             }
         }
+    }
+    private function ProcessDeviceStatus(array $data)
+    {
+        $timestamp = $data['timestamp'];
+        $check = $this->CheckTimestamp('timestamp_device', $timestamp);
+        if ($check === 'INVALID') return;
+
+        $config = $this->GetModuleConfig();
+        $prefix = $this->ReadPropertyString('ProfilePrefix');
+
+        foreach ($config['descriptions']['device_status'] as $index => $name) {
+            if (!isset($data[$name])) continue;
+            $val = $data[$name];
+            $ident = 'dev_' . str_replace(' ', '_', $name);
+
+            // Mask sensor status (Ported from line 412)
+            if ($name == 'sensor_status') $val = $val & bindec('111111111');
+
+            $this->MaintainVariable($ident, $name, 1, $prefix . $this->GetProfileForName($name), $index + 50, true);
+            $this->HandleValueUpdate($ident, $val, $timestamp, $check);
+        }
+    }
+
+    private function ProcessHubStatus(array $data)
+    {
+        $timestamp = $data['timestamp'];
+        $check = $this->CheckTimestamp('timestamp_hub', $timestamp);
+        if ($check === 'INVALID') return;
+
+        $config = $this->GetModuleConfig();
+        $prefix = $this->ReadPropertyString('ProfilePrefix');
+
+        foreach ($config['descriptions']['hub_status'] as $index => $name) {
+            if (!isset($data[$name])) continue;
+            $val = $data[$name];
+
+            if ($name == 'radio_stats') {
+                foreach ($val as $subIndex => $subVal) {
+                    $subName = $config['descriptions']['radio_stats'][$subIndex];
+                    $subIdent = 'hub_radio_' . str_replace(' ', '_', $subName);
+                    $this->MaintainVariable($subIdent, $subName, 1, $prefix . $this->GetProfileForName($subName), $subIndex + 100, true);
+                    $this->HandleValueUpdate($subIdent, $subVal, $timestamp, $check);
+                }
+            } else {
+                $ident = 'hub_' . str_replace(' ', '_', $name);
+                $this->MaintainVariable($ident, $name, 1, $prefix . $this->GetProfileForName($name), $index + 80, true);
+                $this->HandleValueUpdate($ident, $val, $timestamp, $check);
+            }
+        }
+    }
+
+    private function ProcessRapidWind(array $data)
+    {
+        $timestamp = $data['ob'][0];
+        $check = $this->CheckTimestamp('Time_Epoch_Wind', $timestamp);
+        if ($check === 'INVALID') return;
+        $prefix = $this->ReadPropertyString('ProfilePrefix');
+
+        $this->MaintainVariable('Wind_Speed', 'Wind Speed', 2, $prefix . 'km_pro_stunde', 10, true);
+        $this->HandleValueUpdate('Wind_Speed', $data['ob'][1] * 3.6, $timestamp, $check);
+
+        $this->MaintainVariable('Wind_Direction_Rapid', 'Wind Direction (Rapid)', 1, $prefix . 'wind_direction', 11, true);
+        $this->HandleValueUpdate('Wind_Direction_Rapid', $data['ob'][2], $timestamp, $check);
+    }
+
+    private function ProcessPrecip(array $data)
+    {
+        $timestamp = $data['evt'][0];
+        $prefix = $this->ReadPropertyString('ProfilePrefix');
+        $this->MaintainVariable('Rain_Start_Event', 'Rain Start Event', 1, $prefix . '~UnixTimestamp', 120, true);
+        $this->HandleValueUpdate('Rain_Start_Event', $timestamp, $timestamp, 'NEW_VALUE');
+    }
+
+    private function ProcessStrike(array $data)
+    {
+        $timestamp = $data['evt'][0];
+        $prefix = $this->ReadPropertyString('ProfilePrefix');
+
+        $this->MaintainVariable('Strike_Distance', 'Distance', 2, $prefix . 'km', 130, true);
+        $this->HandleValueUpdate('Strike_Distance', $data['evt'][1], $timestamp, 'NEW_VALUE');
+
+        $this->MaintainVariable('Strike_Energy', 'Energy', 1, $prefix . 'energy', 131, true);
+        $this->HandleValueUpdate('Strike_Energy', $data['evt'][2], $timestamp, 'NEW_VALUE');
     }
 }
