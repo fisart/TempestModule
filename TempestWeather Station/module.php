@@ -215,7 +215,7 @@ class TempestWeatherStation extends IPSModule
                 'km'               => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' km', 'min' => 0, 'max' => 100, 'step' => 0.01],
                 'rssi'             => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' dB', 'min' => -100, 'max' => 0, 'step' => 1],
                 'seconds'          => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' s', 'min' => 0, 'max' => 999999999, 'step' => 1],
-                '~UnixTimestamp'   => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 999999999, 'step' => 1],
+                'UnixTimestamp'   => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 999999999, 'step' => 1],
                 'slope'            => ['type' => 2, 'digits' => 9, 'prefix' => '', 'suffix' => ' mx+b', 'min' => -10, 'max' => 10, 'step' => 0.00000001],
                 'battery_status'   => ['type' => 0, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 1, 'step' => 0, 'associations' => ['Text' => [false => 'Discharge', true => 'Charge'], 'Color' => [false => $red, true => $green]]],
                 'system_condition' => ['type' => 2, 'digits' => 3, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 3, 'step' => 0.001, 'associations' => null],
@@ -234,22 +234,30 @@ class TempestWeatherStation extends IPSModule
 
     private function GetProfileForName(string $name)
     {
-        $mapping = ['Air Temperature' => 'celcius', 'Relative Humidity' => 'percent', 'Wind Avg' => 'km_pro_stunde', 'Battery' => 'volt'];
+        $mapping = [
+            'Air Temperature' => 'celcius',
+            'Relative Humidity' => 'percent',
+            'Wind Avg' => 'km_pro_stunde',
+            'Battery' => 'volt',
+            'Time Epoch' => 'UnixTimestamp',
+            'timestamp' => 'UnixTimestamp'
+        ];
         return $mapping[$name] ?? 'text';
     }
 
     private function RegisterProfile($name, $type, $digits, $prefix, $suffix, $min, $max, $step, $associations)
     {
-        if (strpos($name, '~') === 0) return;
+        // Fix: Do not allow ~ anywhere in custom profile names
+        if (strpos($name, '~') !== false) return;
         if (!IPS_VariableProfileExists($name)) IPS_CreateVariableProfile($name, $type);
         IPS_SetVariableProfileText($name, $prefix, $suffix);
 
-        if ($type == 1 || $type == 2) { // Only for Integer (1) and Float (2)
+        if ($type == 1 || $type == 2) {
             IPS_SetVariableProfileDigits($name, $digits);
             IPS_SetVariableProfileValues($name, $min, $max, $step);
         }
 
-        if ($type != 3 && $associations) { // String (3) does not support associations
+        if ($type != 3 && $associations) {
             foreach ($associations['Text'] as $key => $text) {
                 IPS_SetVariableProfileAssociation($name, (float)$key, $text, '', $associations['Color'][$key] ?? -1);
             }
@@ -279,6 +287,7 @@ class TempestWeatherStation extends IPSModule
 
     private function ProcessHubStatus(array $data)
     {
+        if (!isset($data['timestamp'])) return;
         $timestamp = $data['timestamp'];
         $check = $this->CheckTimestamp('timestamp_hub', $timestamp);
         if ($check === 'INVALID') return;
@@ -287,11 +296,12 @@ class TempestWeatherStation extends IPSModule
         $prefix = $this->ReadPropertyString('ProfilePrefix');
 
         foreach ($config['descriptions']['hub_status'] as $index => $name) {
-            if (!isset($data[$name])) continue;
+            if ($name === null || !isset($data[$name])) continue;
             $val = $data[$name];
 
-            if ($name == 'radio_stats') {
+            if ($name == 'radio_stats' && is_array($val)) {
                 foreach ($val as $subIndex => $subVal) {
+                    if (!isset($config['descriptions']['radio_stats'][$subIndex])) continue;
                     $subName = $config['descriptions']['radio_stats'][$subIndex];
                     $subIdent = 'hub_radio_' . str_replace(' ', '_', $subName);
                     $this->MaintainVariable($subIdent, $subName, 1, $prefix . $this->GetProfileForName($subName), $subIndex + 100, true);
@@ -323,7 +333,7 @@ class TempestWeatherStation extends IPSModule
     {
         $timestamp = $data['evt'][0];
         $prefix = $this->ReadPropertyString('ProfilePrefix');
-        $this->MaintainVariable('Rain_Start_Event', 'Rain Start Event', 1, $prefix . '~UnixTimestamp', 120, true);
+        $this->MaintainVariable('Rain_Start_Event', 'Rain Start Event', 1, $prefix . 'UnixTimestamp', 120, true);
         $this->HandleValueUpdate('Rain_Start_Event', $timestamp, $timestamp, 'NEW_VALUE');
     }
 
