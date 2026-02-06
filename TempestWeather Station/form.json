@@ -1,7 +1,7 @@
 {
     "elements": [
         { "type": "ExpansionPanel", "caption": "General Settings", "items": [
-            { "type": "ValidationTextField", "name": "ProfilePrefix", "caption": "Profile Prefix" }
+            { "type": "ValidationTextBox", "name": "ProfilePrefix", "caption": "Profile Prefix" }
         ]},
         { "type": "ExpansionPanel", "caption": "Battery Regression (Experimental)", "items": [
             { "type": "CheckBox", "name": "ExperimentalRegression", "caption": "Enable Battery Hysteresis Logic" },
