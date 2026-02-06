@@ -18,6 +18,7 @@ class TempestWeatherStation extends IPSModule
         parent::Create();
 
         // General Settings
+        $this->RegisterPropertyString('StationName', 'Tempest Station Status');
         $this->RegisterPropertyString('ProfilePrefix', 'Tempest_');
 
         // Battery Regression
@@ -25,10 +26,21 @@ class TempestWeatherStation extends IPSModule
         $this->RegisterPropertyString('TriggerValueSlope', '0.000004');
         $this->RegisterPropertyInteger('RegressionDataPoints', 45);
 
-        // Visualization
+        // Visualization & Dashboard
         $this->RegisterPropertyBoolean('EnableHTML', true);
+        $this->RegisterPropertyInteger('HTMLBackgroundColor', 0x222222);
+        $this->RegisterPropertyInteger('HTMLFontColor', 0xFFFFFF);
+        $this->RegisterPropertyString('HTMLVariableList', json_encode([
+            ['Label' => 'Temperature', 'Show' => true, 'Row' => 1, 'Col' => 1, 'Ident' => 'Air_Temperature'],
+            ['Label' => 'Humidity', 'Show' => true, 'Row' => 1, 'Col' => 2, 'Ident' => 'Relative_Humidity'],
+            ['Label' => 'Pressure', 'Show' => true, 'Row' => 2, 'Col' => 1, 'Ident' => 'Station_Pressure'],
+            ['Label' => 'Wind Avg', 'Show' => true, 'Row' => 2, 'Col' => 2, 'Ident' => 'Wind_Avg'],
+            ['Label' => 'Battery', 'Show' => true, 'Row' => 3, 'Col' => 1, 'Ident' => 'Battery'],
+            ['Label' => 'Solar Rad.', 'Show' => true, 'Row' => 3, 'Col' => 2, 'Ident' => 'Solar_Radiation']
+        ]));
         $this->RegisterVariableString('Dashboard', 'Dashboard', '~HTMLBox', 150);
-        // Variable Selection (Observations)
+
+        // Granular Selectors
         $this->RegisterPropertyBoolean('Var_Wind', true);
         $this->RegisterPropertyBoolean('Var_Air', true);
         $this->RegisterPropertyBoolean('Var_Light', true);
@@ -81,6 +93,8 @@ class TempestWeatherStation extends IPSModule
                 if ($this->ReadPropertyBoolean('MsgStrike')) $this->ProcessStrike($payload);
                 break;
         }
+
+        // Always update Dashboard if enabled
         $this->GenerateHTMLDashboard();
     }
 
@@ -227,22 +241,38 @@ class TempestWeatherStation extends IPSModule
     {
         if (!$this->ReadPropertyBoolean('EnableHTML')) return;
 
-        $temp = @GetValue($this->GetIDForIdent('Air_Temperature')) ?? '--';
-        $hum  = @GetValue($this->GetIDForIdent('Relative_Humidity')) ?? '--';
-        $wind = @GetValue($this->GetIDForIdent('Wind_Avg')) ?? '--';
-        $batt = @GetValue($this->GetIDForIdent('Battery')) ?? '--';
-        $state = @GetValue($this->GetIDForIdent('Battery_Status')) ? 'Charging' : 'Discharging';
+        $stationName = $this->ReadPropertyString('StationName');
+        $bgColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLBackgroundColor'));
+        $fontColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLFontColor'));
+        $varList = json_decode($this->ReadPropertyString('HTMLVariableList'), true);
+
+        $itemsHtml = "";
+        foreach ($varList as $item) {
+            if (!$item['Show']) continue;
+
+            $varID = @$this->GetIDForIdent($item['Ident']);
+            if ($varID) {
+                $val = GetValue($varID);
+                $profile = IPS_GetVariable($varID)['VariableCustomProfile'] ?: IPS_GetVariable($varID)['VariableProfile'];
+                $formatted = IPS_VariableProfileExists($profile) ? IPS_VariableProfileText($profile, $val) : $val;
+            } else {
+                $formatted = '--';
+            }
+
+            $itemsHtml .= "
+            <div style='grid-row: {$item['Row']}; grid-column: {$item['Col']}; border: 1px solid rgba(255,255,255,0.1); padding: 1cqi; text-align: center; display: flex; flex-direction: column; justify-content: center; border-radius: 4px;'>
+                <div style='font-size: 3cqi; opacity: 0.8; margin-bottom: 0.2cqi;'>{$item['Label']}</div>
+                <div style='font-size: 5cqi; font-weight: bold;'>$formatted</div>
+            </div>";
+        }
 
         $html = "
-        <div style='font-family:sans-serif; padding:10px; border-radius:10px; background-color:rgba(0,0,0,0.1);'>
-            <h3 style='margin:0 0 10px 0;'>Tempest Station Status</h3>
-            <div style='display:flex; justify-content:space-between;'>
-                <div><b>Temp:</b> $temp °C</div>
-                <div><b>Humidity:</b> $hum %</div>
+        <div style='container-type: inline-size; background-color: $bgColor; color: $fontColor; font-family: Segoe UI, sans-serif; height: 100%; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 2cqi; border-radius: 8px;'>
+            <div style='text-align: center; font-size: 6cqi; font-weight: bold; padding-bottom: 2cqi; border-bottom: 1px solid rgba(255,255,255,0.2);'>
+                $stationName
             </div>
-            <div style='display:flex; justify-content:space-between; margin-top:5px;'>
-                <div><b>Wind:</b> $wind km/h</div>
-                <div><b>Battery:</b> $batt V ($state)</div>
+            <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(10cqi, 1fr)); grid-auto-rows: 1fr; gap: 1.5cqi; flex-grow: 1; margin-top: 2cqi;'>
+                $itemsHtml
             </div>
         </div>";
 

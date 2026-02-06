@@ -1,6 +1,7 @@
 {
     "elements": [
         { "type": "ExpansionPanel", "caption": "General Settings", "items": [
+            { "type": "ValidationTextBox", "name": "StationName", "caption": "Station Name" },
             { "type": "ValidationTextBox", "name": "ProfilePrefix", "caption": "Profile Prefix" }
         ]},
         { "type": "ExpansionPanel", "caption": "Battery Regression (Experimental)", "items": [
@@ -8,18 +9,37 @@
             { "type": "NumberSpinner", "name": "TriggerValueSlope", "caption": "Trigger Value Slope (m)", "digits": 6 },
             { "type": "NumberSpinner", "name": "RegressionDataPoints", "caption": "Number of Datapoints", "minimum": 5, "maximum": 500 }
         ]},
-        { "type": "ExpansionPanel", "caption": "Variable Selection", "items": [
-            { "type": "Label", "caption": "Select message types to process and create variables for:" },
-            { "type": "CheckBox", "name": "MsgObsSt", "caption": "Observations (obs_st)" },
-            { "type": "CheckBox", "name": "MsgDeviceStatus", "caption": "Device Status (device_status)" },
-            { "type": "CheckBox", "name": "MsgHubStatus", "caption": "Hub Status (hub_status)" },
-            { "type": "CheckBox", "name": "MsgRapidWind", "caption": "Rapid Wind (rapid_wind)" },
-            { "type": "CheckBox", "name": "MsgPrecip", "caption": "Precipitation Events (evt_precip)" },
-            { "type": "CheckBox", "name": "MsgStrike", "caption": "Lightning Strikes (evt_strike)" }
+        { "type": "ExpansionPanel", "caption": "Variable Selection (Observations)", "items": [
+            { "type": "CheckBox", "name": "Var_Wind", "caption": "Wind (Avg, Lull, Gust, Dir, Interval)", "value": true },
+            { "type": "CheckBox", "name": "Var_Air", "caption": "Air (Temp, Humidity, Pressure)", "value": true },
+            { "type": "CheckBox", "name": "Var_Light", "caption": "Light (Illuminance, UV, Solar Radiation)", "value": true },
+            { "type": "CheckBox", "name": "Var_Precip", "caption": "Precipitation (Accumulated, Type)", "value": true },
+            { "type": "CheckBox", "name": "Var_Lightning", "caption": "Lightning (Distance, Count)", "value": true },
+            { "type": "CheckBox", "name": "Var_System", "caption": "System (Battery, Report Interval)", "value": true }
         ]},
-        { "type": "ExpansionPanel", "caption": "Visualization", "items": [
-            { "type": "CheckBox", "name": "EnableHTML", "caption": "Enable HTML Dashboard" }
-        ]}
+        { "type": "ExpansionPanel", "caption": "Variable Selection (Status Messages)", "items": [
+            { "type": "CheckBox", "name": "MsgDeviceStatus", "caption": "Device Status (Uptime, Voltage, RSSI)", "value": true },
+            { "type": "CheckBox", "name": "MsgHubStatus", "caption": "Hub Status (Radio Stats, Seq, Flags)", "value": true }
+        ]},
+        { "type": "ExpansionPanel", "caption": "Dashboard Customization", "items": [
+            { "type": "CheckBox", "name": "EnableHTML", "caption": "Enable HTML Dashboard" },
+            { "type": "SelectColor", "name": "HTMLBackgroundColor", "caption": "Background Color" },
+            { "type": "SelectColor", "name": "HTMLFontColor", "caption": "Font Color" },
+            {
+                "type": "List",
+                "name": "HTMLVariableList",
+                "caption": "Grid Configuration (Row/Col starts at 1)",
+                "add": false, "delete": false,
+                "sort": { "column": "Row", "direction": "ascending" },
+                "columns": [
+                    { "caption": "Variable", "name": "Label", "width": "180px", "readOnly": true },
+                    { "caption": "Show", "name": "Show", "width": "60px", "edit": { "type": "CheckBox" } },
+                    { "caption": "Row", "name": "Row", "width": "80px", "edit": { "type": "NumberSpinner", "minimum": 1, "maximum": 10 } },
+                    { "caption": "Col", "name": "Col", "width": "80px", "edit": { "type": "NumberSpinner", "minimum": 1, "maximum": 4 } },
+                    { "caption": "Ident", "name": "Ident", "width": "0px" }
+                ]
+            }
+        ]
     ],
     "actions": [
         { "type": "Button", "label": "Update Profiles Now", "onClick": "TMT_UpdateProfiles($id);" },
