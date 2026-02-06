@@ -254,7 +254,8 @@ class TempestWeatherStation extends IPSModule
             if ($varID) {
                 $val = GetValue($varID);
                 $profile = IPS_GetVariable($varID)['VariableCustomProfile'] ?: IPS_GetVariable($varID)['VariableProfile'];
-                $formatted = IPS_VariableProfileExists($profile) ? IPS_VariableProfileText($profile, $val) : $val;
+                // Fix: Correct function name is IPS_GetVariableProfileText
+                $formatted = (IPS_VariableProfileExists($profile)) ? IPS_GetVariableProfileText($profile, $val) : $val;
             } else {
                 $formatted = '--';
             }
@@ -468,22 +469,25 @@ class TempestWeatherStation extends IPSModule
 
     private function RegisterProfile($name, $type, $digits, $prefix, $suffix, $min, $max, $step, $associations)
     {
-        // Fix: Do not allow ~ anywhere in custom profile names
         if (strpos($name, '~') !== false) return;
         if (!IPS_VariableProfileExists($name)) IPS_CreateVariableProfile($name, $type);
         IPS_SetVariableProfileText($name, $prefix, $suffix);
 
-        if ($type == 1 || $type == 2) {
+        if ($type === 1 || $type === 2) {
             IPS_SetVariableProfileDigits($name, $digits);
             IPS_SetVariableProfileValues($name, $min, $max, $step);
         }
 
-        if ($type != 3 && $associations) {
+        if ($type !== 3 && $associations) {
             foreach ($associations['Text'] as $key => $text) {
-                IPS_SetVariableProfileAssociation($name, (float)$key, $text, '', $associations['Color'][$key] ?? -1);
+                // Fix: Cast key to float for Float profiles, int for others to prevent type mismatch
+                $assocValue = ($type === 2) ? (float)$key : (int)$key;
+                IPS_SetVariableProfileAssociation($name, $assocValue, $text, '', $associations['Color'][$key] ?? -1);
             }
         }
     }
+
+
     private function ProcessDeviceStatus(array $data)
     {
         $timestamp = $data['timestamp'];
