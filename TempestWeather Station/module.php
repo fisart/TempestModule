@@ -139,7 +139,7 @@ class TempestWeatherStation extends IPSModule
 
             $type = 2;
             if (in_array($index, [0, 4, 5, 9, 13, 15, 17, 22, 25, 26])) $type = 1;
-            if ($index == 20) $type = 0;
+            if ($index == 20) $type = 1;
 
             $this->MaintainVariable($ident, $name, $type, $prefix . $this->GetProfileForName($name), $index, true);
             $this->HandleValueUpdate($ident, $val, $timestamp, $check);
@@ -255,7 +255,7 @@ class TempestWeatherStation extends IPSModule
                 $val = GetValue($varID);
                 $profile = IPS_GetVariable($varID)['VariableCustomProfile'] ?: IPS_GetVariable($varID)['VariableProfile'];
                 // Fix: Correct function name is IPS_GetVariableProfileText
-                $formatted = (IPS_VariableProfileExists($profile)) ? IPS_GetVariableProfileText($profile, $val) : $val;
+                $formatted = GetValueFormatted($varID);
             } else {
                 $formatted = '--';
             }
@@ -408,7 +408,7 @@ class TempestWeatherStation extends IPSModule
                 'minutes'          => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' min', 'min' => 0, 'max' => 60, 'step' => 1],
                 'UnixTimestamp'    => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 999999999, 'step' => 1],
                 'slope'            => ['type' => 2, 'digits' => 9, 'prefix' => '', 'suffix' => ' mx+b', 'min' => -10, 'max' => 10, 'step' => 0.00000001],
-                'battery_status'   => ['type' => 0, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 1, 'step' => 0, 'associations' => ['Text' => [false => 'Discharge', true => 'Charge'], 'Color' => [false => $red, true => $green]]],
+                'battery_status' => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 1, 'step' => 0, 'associations' => ['Text' => [0 => 'Discharge', 1 => 'Charge'], 'Color' => [0 => $red, 1 => $green]]],
                 'perception_type'  => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 2, 'step' => 1, 'associations' => ['Text' => [0 => 'none', 1 => 'rain', 2 => 'hail'], 'Color' => [0 => $green, 1 => $blue, 2 => $red]]],
                 'Radio_Status'     => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 3, 'step' => 1, 'associations' => ['Text' => [0 => 'Off', 1 => 'On', 3 => 'Active'], 'Color' => [0 => $red, 1 => $blue, 3 => $green]]],
                 'text'             => ['type' => 3, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 0, 'step' => 0]
@@ -452,10 +452,12 @@ class TempestWeatherStation extends IPSModule
             'Precipitation Type'            => 'perception_type',
             'Lightning Strike Avg Distance' => 'km',
             'Distance'                      => 'km',
+            'Lightning Strike Count'        => 'seconds',
             'Report Interval'               => 'minutes',
             'Wind Sample Interval'          => 'seconds',
             'time_delta'                    => 'seconds',
             'stamp_delta'                   => 'seconds',
+            'uptime'                        => 'seconds',
             'rssi'                          => 'rssi',
             'hub_rssi'                      => 'rssi',
             'Radio Status'                  => 'Radio_Status',
@@ -478,7 +480,7 @@ class TempestWeatherStation extends IPSModule
             IPS_SetVariableProfileValues($name, $min, $max, $step);
         }
 
-        if ($type !== 3 && $associations) {
+        if (($type === 1 || $type === 2) && $associations) {
             foreach ($associations['Text'] as $key => $text) {
                 // Fix: Cast key to float for Float profiles, int for others to prevent type mismatch
                 $assocValue = ($type === 2) ? (float)$key : (int)$key;
