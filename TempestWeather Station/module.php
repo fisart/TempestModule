@@ -27,7 +27,7 @@ class TempestWeatherStation extends IPSModule
 
         // Visualization
         $this->RegisterPropertyBoolean('EnableHTML', true);
-
+        $this->RegisterVariableString('Dashboard', 'Dashboard', '~HTMLBox', 150);
         // Variable Selection (Observations)
         $this->RegisterPropertyBoolean('Var_Wind', true);
         $this->RegisterPropertyBoolean('Var_Air', true);
