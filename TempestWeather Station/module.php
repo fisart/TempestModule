@@ -14,13 +14,27 @@ class TempestWeatherStation extends IPSModule
 
     public function Create()
     {
+        // Never delete this line!
         parent::Create();
 
-        // Register Properties from form.json
+        // General Settings
         $this->RegisterPropertyString('ProfilePrefix', 'Tempest_');
+
+        // Battery Regression
         $this->RegisterPropertyBoolean('ExperimentalRegression', true);
         $this->RegisterPropertyString('TriggerValueSlope', '0.000004');
         $this->RegisterPropertyInteger('RegressionDataPoints', 45);
+
+        // Visualization
+        $this->RegisterPropertyBoolean('EnableHTML', true);
+
+        // Variable Selection (Observations)
+        $this->RegisterPropertyPropertyBoolean('Var_Wind', true);
+        $this->RegisterPropertyBoolean('Var_Air', true);
+        $this->RegisterPropertyBoolean('Var_Light', true);
+        $this->RegisterPropertyBoolean('Var_Precip', true);
+        $this->RegisterPropertyBoolean('Var_Lightning', true);
+        $this->RegisterPropertyBoolean('Var_System', true);
 
         // Message Type Toggles
         $this->RegisterPropertyBoolean('MsgObsSt', true);
@@ -29,9 +43,6 @@ class TempestWeatherStation extends IPSModule
         $this->RegisterPropertyBoolean('MsgRapidWind', true);
         $this->RegisterPropertyBoolean('MsgPrecip', true);
         $this->RegisterPropertyBoolean('MsgStrike', true);
-
-        $this->RegisterPropertyBoolean('EnableHTML', true);
-        $this->RegisterVariableString('Dashboard', 'Dashboard', '~HTMLBox', 150);
     }
 
     public function ApplyChanges()
@@ -90,16 +101,39 @@ class TempestWeatherStation extends IPSModule
         $prefix = $this->ReadPropertyString('ProfilePrefix');
 
         foreach ($config['descriptions']['obs_st'] as $index => $name) {
-            $val = $obs[$index];
+            // Skip Rohdaten (Original index 19)
+            if ($index == 19) continue;
+
+            $shouldCreate = false;
+            if ($index == 0) $shouldCreate = true;
+            if (in_array($index, [1, 2, 3, 4, 5]) && $this->ReadPropertyBoolean('Var_Wind')) $shouldCreate = true;
+            if (in_array($index, [6, 7, 8]) && $this->ReadPropertyBoolean('Var_Air')) $shouldCreate = true;
+            if (in_array($index, [9, 10, 11]) && $this->ReadPropertyBoolean('Var_Light')) $shouldCreate = true;
+            if (in_array($index, [12, 13]) && $this->ReadPropertyBoolean('Var_Precip')) $shouldCreate = true;
+            if (in_array($index, [14, 15]) && $this->ReadPropertyBoolean('Var_Lightning')) $shouldCreate = true;
+            if (in_array($index, [16, 17]) && $this->ReadPropertyBoolean('Var_System')) $shouldCreate = true;
+            if ($index >= 18) $shouldCreate = true;
+
+            if (!$shouldCreate) continue;
+
+            $val = $obs[$index] ?? null;
             $ident = str_replace([' ', '(', ')'], ['_', '', ''], $name);
 
-            if (strpos($name, 'Wind') !== false && $name != 'Wind Direction') {
+            if (strpos($name, 'Wind') !== false && strpos($name, 'Direction') === false && strpos($name, 'Interval') === false) {
                 $val = $val * 3.6;
             }
 
-            $this->MaintainVariable($ident, $name, 2, $prefix . $this->GetProfileForName($name), $index, true);
+            $type = 2;
+            if (in_array($index, [0, 4, 5, 9, 13, 15, 17, 22, 25, 26])) $type = 1;
+            if ($index == 20) $type = 0;
+
+            $this->MaintainVariable($ident, $name, $type, $prefix . $this->GetProfileForName($name), $index, true);
             $this->HandleValueUpdate($ident, $val, $timestamp, $check);
         }
+
+        $delta = time() - $timestamp;
+        $this->MaintainVariable('stamp_delta', 'stamp_delta', 1, $prefix . 'seconds', 26, true);
+        $this->HandleValueUpdate('stamp_delta', $delta, $timestamp, 'NEW_VALUE');
 
         if ($this->ReadPropertyBoolean('ExperimentalRegression')) {
             $this->UpdateBatteryLogic($obs[16]);
@@ -223,15 +257,90 @@ class TempestWeatherStation extends IPSModule
                     2 => 'Wind Avg',
                     3 => 'Wind Gust',
                     4 => 'Wind Direction',
+                    5 => 'Wind Sample Interval',
+                    6 => 'Station Pressure',
                     7 => 'Air Temperature',
                     8 => 'Relative Humidity',
+                    9 => 'Illuminance',
+                    10 => 'UV',
                     11 => 'Solar Radiation',
                     12 => 'Precip Accumulated',
-                    16 => 'Battery'
+                    13 => 'Precipitation Type',
+                    14 => 'Lightning Strike Avg Distance',
+                    15 => 'Lightning Strike Count',
+                    16 => 'Battery',
+                    17 => 'Report Interval',
+                    18 => 'Slope',
+                    19 => 'Rohdaten',
+                    20 => 'Battery Status',
+                    21 => 'System Condition',
+                    22 => 'Counter Slope Datasets',
+                    23 => 'Average',
+                    24 => 'Median',
+                    25 => 'time_delta',
+                    26 => 'stamp_delta'
                 ],
-                'device_status' => [4 => 'uptime', 5 => 'voltage', 7 => 'rssi', 8 => 'hub_rssi', 9 => 'sensor_status'],
-                'hub_status' => [3 => 'uptime', 4 => 'rssi', 9 => 'radio_stats'],
-                'radio_stats' => [1 => 'Reboot Count', 2 => 'I2C Bus Error Count', 3 => 'Radio Status']
+                'device_status' => [
+                    0 => 'serial_number',
+                    1 => 'type',
+                    2 => 'hub_sn',
+                    3 => 'timestamp',
+                    4 => 'uptime',
+                    5 => 'voltage',
+                    6 => 'firmware_revision',
+                    7 => 'rssi',
+                    8 => 'hub_rssi',
+                    9 => 'sensor_status',
+                    10 => 'debug',
+                    11 => 'Rohdaten',
+                    12 => 'time_delta'
+                ],
+                'hub_status' => [
+                    0 => 'serial_number',
+                    1 => 'type',
+                    2 => 'firmware_revision',
+                    3 => 'uptime',
+                    4 => 'rssi',
+                    5 => 'timestamp',
+                    6 => 'reset_flags',
+                    7 => 'seq',
+                    8 => 'fs',
+                    9 => 'radio_stats',
+                    10 => 'mqtt_stats',
+                    11 => 'Version',
+                    12 => 'Reboot Count',
+                    13 => 'I2C Bus Error Count',
+                    14 => 'Radio Status',
+                    15 => 'Radio Network ID',
+                    16 => 'Rohdaten',
+                    17 => 'time_delta'
+                ],
+                'radio_stats' => [
+                    0 => 'Version',
+                    1 => 'Reboot Count',
+                    2 => 'I2C Bus Error Count',
+                    3 => 'Radio Status',
+                    4 => 'Radio Network ID'
+                ],
+                'evt_strike' => [
+                    0 => 'Time Epoch',
+                    1 => 'Distance',
+                    2 => 'Energy',
+                    3 => 'Rohdaten',
+                    4 => 'time_delta'
+                ],
+                'rapid_wind' => [
+                    0 => 'Time Epoch',
+                    1 => 'Wind Speed',
+                    2 => 'Wind Direction',
+                    3 => 'Rohdaten',
+                    4 => 'time_delta'
+                ],
+                'evt_precip' => [
+                    0 => 'Rain Start Event',
+                    1 => 'Rohdaten',
+                    2 => 'time_delta'
+                ]
             ],
             'profiles' => [
                 'km_pro_stunde'    => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' km/h', 'min' => 0, 'max' => 160, 'step' => 0.01],
@@ -241,13 +350,17 @@ class TempestWeatherStation extends IPSModule
                 'milli_bar'        => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' hPa', 'min' => 0, 'max' => 9999, 'step' => 1],
                 'wind_direction'   => ['type' => 2, 'digits' => 1, 'prefix' => '', 'suffix' => ' °', 'min' => 0, 'max' => 360, 'step' => 1],
                 'energy'           => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' W/m²', 'min' => 0, 'max' => 1000, 'step' => 1],
+                'lux'              => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' Lx', 'min' => 0, 'max' => 120000, 'step' => 1],
+                'index'            => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' UVI', 'min' => 0, 'max' => 15, 'step' => 0.01],
                 'km'               => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' km', 'min' => 0, 'max' => 100, 'step' => 0.01],
                 'rssi'             => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' dB', 'min' => -100, 'max' => 0, 'step' => 1],
                 'seconds'          => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' s', 'min' => 0, 'max' => 999999999, 'step' => 1],
-                'UnixTimestamp'   => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 999999999, 'step' => 1],
+                'minutes'          => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' min', 'min' => 0, 'max' => 60, 'step' => 1],
+                'UnixTimestamp'    => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 999999999, 'step' => 1],
                 'slope'            => ['type' => 2, 'digits' => 9, 'prefix' => '', 'suffix' => ' mx+b', 'min' => -10, 'max' => 10, 'step' => 0.00000001],
                 'battery_status'   => ['type' => 0, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 1, 'step' => 0, 'associations' => ['Text' => [false => 'Discharge', true => 'Charge'], 'Color' => [false => $red, true => $green]]],
-                'system_condition' => ['type' => 2, 'digits' => 3, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 3, 'step' => 0.001, 'associations' => null],
+                'perception_type'  => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 2, 'step' => 1, 'associations' => ['Text' => [0 => 'none', 1 => 'rain', 2 => 'hail'], 'Color' => [0 => $green, 1 => $blue, 2 => $red]]],
+                'Radio_Status'     => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 3, 'step' => 1, 'associations' => ['Text' => [0 => 'Off', 1 => 'On', 3 => 'Active'], 'Color' => [0 => $red, 1 => $blue, 3 => $green]]],
                 'text'             => ['type' => 3, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 0, 'step' => 0]
             ],
             'charge' => [
@@ -264,12 +377,42 @@ class TempestWeatherStation extends IPSModule
     private function GetProfileForName(string $name)
     {
         $mapping = [
-            'Air Temperature' => 'celcius',
-            'Relative Humidity' => 'percent',
-            'Wind Avg' => 'km_pro_stunde',
-            'Battery' => 'volt',
-            'Time Epoch' => 'UnixTimestamp',
-            'timestamp' => 'UnixTimestamp'
+            'Air Temperature'               => 'celcius',
+            'Relative Humidity'             => 'percent',
+            'Wind Avg'                      => 'km_pro_stunde',
+            'Wind Lull'                     => 'km_pro_stunde',
+            'Wind Gust'                     => 'km_pro_stunde',
+            'Wind Speed'                    => 'km_pro_stunde',
+            'Battery'                       => 'volt',
+            'voltage'                       => 'volt',
+            'Average'                       => 'volt',
+            'Median'                        => 'volt',
+            'Average Voltage'               => 'volt',
+            'Median Voltage'                => 'volt',
+            'Time Epoch'                    => 'UnixTimestamp',
+            'timestamp'                     => 'UnixTimestamp',
+            'Rain Start Event'              => 'UnixTimestamp',
+            'Station Pressure'              => 'milli_bar',
+            'Wind Direction'                => 'wind_direction',
+            'Illuminance'                   => 'lux',
+            'UV'                            => 'index',
+            'Solar Radiation'               => 'energy',
+            'Energy'                        => 'energy',
+            'Precip Accumulated'            => 'mm',
+            'Precipitation Type'            => 'perception_type',
+            'Lightning Strike Avg Distance' => 'km',
+            'Distance'                      => 'km',
+            'Report Interval'               => 'minutes',
+            'Wind Sample Interval'          => 'seconds',
+            'time_delta'                    => 'seconds',
+            'stamp_delta'                   => 'seconds',
+            'rssi'                          => 'rssi',
+            'hub_rssi'                      => 'rssi',
+            'Radio Status'                  => 'Radio_Status',
+            'Slope'                         => 'slope',
+            'Regression Slope'              => 'slope',
+            'Battery Status'                => 'battery_status',
+            'System Condition'              => 'system_condition'
         ];
         return $mapping[$name] ?? 'text';
     }
