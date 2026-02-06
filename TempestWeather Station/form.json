@@ -1,11 +1,11 @@
 {
     "elements": [
         { "type": "ExpansionPanel", "caption": "General Settings", "items": [
-            { "type": "ValidationTextField", "name": "ProfilePrefix", "caption": "Profile Prefix", "value": "Tempest_" }
+            { "type": "ValidationInput", "name": "ProfilePrefix", "caption": "Profile Prefix", "value": "Tempest_" }
         ]},
         { "type": "ExpansionPanel", "caption": "Battery Regression (Experimental)", "items": [
             { "type": "CheckBox", "name": "ExperimentalRegression", "caption": "Enable Battery Hysteresis Logic", "value": true },
-            { "type": "ValidationTextField", "name": "TriggerValueSlope", "caption": "Trigger Value Slope (m)", "value": "0.000004" },
+            { "type": "ValidationInput", "name": "TriggerValueSlope", "caption": "Trigger Value Slope (m)", "value": "0.000004" },
             { "type": "NumberSpinner", "name": "RegressionDataPoints", "caption": "Number of Datapoints", "value": 45, "minimum": 5, "maximum": 500 }
         ]},
         { "type": "ExpansionPanel", "caption": "Variable Selection", "items": [
