@@ -195,7 +195,26 @@ class TempestWeatherStation extends IPSModule
 
     private function HandleValueUpdate(string $ident, $value, int $timestamp, string $check)
     {
+        if ($value === null) return;
         $varID = $this->GetIDForIdent($ident);
+        $type = IPS_GetVariable($varID)['VariableType'];
+
+        // Explicit casting based on IP-Symcon Variable Type to prevent "stod" errors
+        switch ($type) {
+            case 0:
+                $value = (bool)$value;
+                break;
+            case 1:
+                $value = (int)$value;
+                break;
+            case 2:
+                $value = (float)$value;
+                break;
+            case 3:
+                $value = (string)$value;
+                break;
+        }
+
         if ($check === 'OLD_TIME_STAMP') {
             $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
             AC_AddLoggedValues($archiveID, $varID, [['TimeStamp' => $timestamp, 'Value' => $value]]);
