@@ -1,0 +1,28 @@
+{
+    "elements": [
+    ],
+    "actions": [
+        { 
+            "name": "ClientIP",
+            "type": "ValidationTextBox",
+            "caption": "Client IP"
+        },
+        {
+            "name": "ClientPort",
+            "type": "NumberSpinner",
+            "caption": "Client Port"
+        },
+        {
+            "name": "Text",
+            "type": "ValidationTextBox",
+            "caption": "Text" 
+        },
+        {
+            "type": "Button",
+            "caption": "Send",
+            "onClick": TMT_Send($id, $Text, $ClientIP, $ClientPort);"
+        }
+    ],
+    "status": [
+    ]
+}
