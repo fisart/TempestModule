@@ -39,7 +39,7 @@
                     { "caption": "Ident", "name": "Ident", "width": "0px" }
                 ]
             }
-        ]
+        }
     ],
     "actions": [
         { "type": "Button", "label": "Update Profiles Now", "onClick": "TMT_UpdateProfiles($id);" },

@@ -5,7 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../libs/RegressionHelper.php';
 
 /**
- * TempestWeatherStation Class
+ * TempestWeatherStation   Class
  * Handles data from Weatherflow Tempest via UDP.
  */
 class TempestWeatherStation extends IPSModule
