@@ -136,19 +136,16 @@ class TempestWeatherStation extends IPSModule
                 $val = $val * 3.6;
             }
 
-            // Fix: Check if profile key exists before accessing 'type'
-            if (!isset($config['profiles'][$profileIdent])) {
-                $this->SendDebug('Observation', 'Missing profile definition for: ' . $profileIdent, 0);
-                continue;
-            }
+            if (!isset($config['profiles'][$profileIdent])) continue;
 
             $varType = $config['profiles'][$profileIdent]['type'];
+            // Fix: Use MaintainVariableSafe for auto-correction
             $this->MaintainVariableSafe($ident, $name, $varType, $prefix . $profileIdent, $index, true);
             $this->HandleValueUpdate($ident, $val, $timestamp, $check);
         }
 
+        // Fix: Removed redundant/conflicting hardcoded $type block
         $delta = time() - $timestamp;
-        $this->MaintainVariable('stamp_delta', 'stamp_delta', 1, $prefix . 'seconds', 26, true);
         $this->HandleValueUpdate('stamp_delta', $delta, $timestamp, 'NEW_VALUE');
 
         if ($this->ReadPropertyBoolean('ExperimentalRegression')) {
@@ -421,12 +418,20 @@ class TempestWeatherStation extends IPSModule
     private function RegisterProfile($name, $type, $digits, $prefix, $suffix, $min, $max, $step, $associations)
     {
         if (strpos($name, '~') !== false) return;
+
+        // Fix: Auto-delete profile if type mismatch exists
+        if (IPS_VariableProfileExists($name) && IPS_GetVariableProfile($name)['ProfileType'] !== $type) {
+            IPS_DeleteVariableProfile($name);
+        }
+
         if (!IPS_VariableProfileExists($name)) IPS_CreateVariableProfile($name, $type);
         IPS_SetVariableProfileText($name, $prefix, $suffix);
+
         if ($type === 1 || $type === 2) {
             IPS_SetVariableProfileDigits($name, $digits);
             IPS_SetVariableProfileValues($name, $min, $max, $step);
         }
+
         if (($type === 1 || $type === 2) && $associations) {
             foreach ($associations['Text'] as $key => $text) {
                 $assocValue = ($type === 2) ? (float)$key : (int)$key;
