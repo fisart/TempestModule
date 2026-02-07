@@ -230,6 +230,7 @@ class TempestWeatherStation extends IPSModule
         $bgColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLBackgroundColor'));
         $fontColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLFontColor'));
         $varList = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
+        $interval = $this->ReadPropertyInteger('HTMLUpdateInterval');
 
         $itemsHtml = "";
         foreach ($varList as $item) {
@@ -239,13 +240,15 @@ class TempestWeatherStation extends IPSModule
             $formatted = ($varID && IPS_VariableExists($varID)) ? GetValueFormatted($varID) : '--';
             $label = $item['Label'] ?? $item['Ident'] ?? 'Unknown';
 
-            // Fix: Lowered multipliers (2.2cqi / 4.5cqi) and added flex alignment for better spacing
             $itemsHtml .= "
-            <div style='grid-area: {$item['Row']} / {$item['Col']}; border: 1px solid rgba(255,255,255,0.1); padding: 1cqi; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 4px; overflow: hidden;'>
+            <div style='grid-area: {$item['Row']} / {$item['Col']}; border: 1px solid rgba(255,255,255,0.15); padding: 1cqi; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 4px; overflow: hidden;'>
                 <div style='font-size: clamp(8px, 2.2cqi, 18px); opacity: 0.7; white-space: nowrap; text-overflow: ellipsis; width: 100%; overflow: hidden;'>$label</div>
                 <div style='font-size: clamp(10px, 4.5cqi, 36px); font-weight: bold; white-space: nowrap;'>$formatted</div>
             </div>";
         }
+
+        // Fix: Added client-side reload script for standalone web views
+        $reloadScript = ($interval > 0) ? "<script>setTimeout(function(){ location.reload(); }, " . ($interval * 1000) . ");</script>" : "";
 
         $html = "
         <div style='container-type: inline-size; background-color: $bgColor; color: $fontColor; font-family: \"Segoe UI\", sans-serif; height: 100%; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 1.5cqi; border-radius: 8px;'>
@@ -253,6 +256,7 @@ class TempestWeatherStation extends IPSModule
             <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1cqi; flex-grow: 1; margin-top: 1.5cqi;'>
                 $itemsHtml
             </div>
+            $reloadScript
         </div>";
 
         $this->SetValue('Dashboard', $html);
