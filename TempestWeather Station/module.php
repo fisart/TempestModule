@@ -540,20 +540,24 @@ class TempestWeatherStation extends IPSModule
         $values = json_decode($propertyData, true) ?: [];
         $existingIdents = array_column($values, 'Ident');
 
-        // Refresh labels for existing items
+        // 1. Refresh labels for existing items
         foreach ($values as &$val) {
             if (isset($val['Ident']) && isset($master[$val['Ident']])) {
                 $val['Label'] = $master[$val['Ident']];
             }
         }
-        // Inject missing variables from metadata
+        // 2. Inject missing variables from metadata
         foreach ($master as $ident => $label) {
             if (!in_array($ident, $existingIdents)) {
                 $values[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
             }
         }
 
-        // Move the list to Actions for persistence management
+        // 3. Section 3, Step 2: Write the FULL discovered list to RAM-Cache
+        // This ensures the "Save" button has a complete dataset to work with
+        $this->WriteAttributeString('HTMLVariableListBuffer', json_encode($values));
+
+        // 4. Section 3, Step 1: Move the list to Actions
         foreach ($form['elements'] as $k => $panel) {
             if (isset($panel['caption']) && $panel['caption'] == 'Dashboard Customization') {
                 foreach ($panel['items'] as $i => $item) {
@@ -575,22 +579,48 @@ class TempestWeatherStation extends IPSModule
 
     public function UpdateDashboardRow(string $HTMLVariableList)
     {
-        // PDF Section 3, Step 3: The onEdit handler
-        // Receives the UI state as a JSON string and writes it to the RAM-Cache
-        $this->SendDebug('UI-Update', $HTMLVariableList, 0);
-        $this->WriteAttributeString('HTMLVariableListBuffer', $HTMLVariableList);
+        $newData = json_decode($HTMLVariableList, true);
+        if (!is_array($newData)) return;
+
+        // Ensure we handle single row vs multi-row wraps
+        if (isset($newData['Ident'])) {
+            $newData = [$newData];
+        }
+
+        // 1. Get the current full state from RAM-Cache
+        $buffer = json_decode($this->ReadAttributeString('HTMLVariableListBuffer'), true) ?: [];
+
+        // 2. Convert to map for merging
+        $map = [];
+        foreach ($buffer as $item) {
+            if (isset($item['Ident'])) $map[$item['Ident']] = $item;
+        }
+
+        // 3. Update only the changed row(s)
+        foreach ($newData as $row) {
+            if (isset($row['Ident'])) {
+                $map[$row['Ident']] = $row;
+            }
+        }
+
+        // 4. Write the full merged list back to RAM-Cache
+        $this->WriteAttributeString('HTMLVariableListBuffer', json_encode(array_values($map)));
+        $this->SendDebug('UI-Update', 'RAM-Cache updated via merge.', 0);
     }
 
     public function SaveSelections()
     {
+        // Section 4 Summary: Committing RAM Attribute to Property
         $buffer = $this->ReadAttributeString('HTMLVariableListBuffer');
+
         if ($buffer === '' || $buffer === '[]') {
-            echo "No changes to save or buffer empty.";
+            echo "Selection list is empty. Please open the configuration form first.";
             return;
         }
 
         IPS_SetProperty($this->InstanceID, 'HTMLVariableList', $buffer);
         IPS_ApplyChanges($this->InstanceID);
-        echo "Dashboard selection saved permanently.";
+
+        echo "Dashboard selection saved and applied.";
     }
 }
