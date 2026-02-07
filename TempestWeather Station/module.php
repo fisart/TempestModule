@@ -59,8 +59,31 @@ class TempestWeatherStation extends IPSModule
 
     public function ApplyChanges()
     {
+        // Never delete this line!
         parent::ApplyChanges();
+
         $this->UpdateProfiles();
+
+        // Self-healing: Reset the Variable List if it is empty or corrupted (missing Ident keys)
+        $listString = $this->ReadPropertyString('HTMLVariableList');
+        $list = json_decode($listString, true);
+
+        if (empty($list) || (isset($list[0]) && !isset($list[0]['Ident']))) {
+            $default = [
+                ['Label' => 'Temperature', 'Show' => true, 'Row' => 1, 'Col' => 1, 'Ident' => 'Air_Temperature'],
+                ['Label' => 'Humidity', 'Show' => true, 'Row' => 1, 'Col' => 2, 'Ident' => 'Relative_Humidity'],
+                ['Label' => 'Pressure', 'Show' => true, 'Row' => 2, 'Col' => 1, 'Ident' => 'Station_Pressure'],
+                ['Label' => 'Wind Avg', 'Show' => true, 'Row' => 2, 'Col' => 2, 'Ident' => 'Wind_Avg'],
+                ['Label' => 'Battery', 'Show' => true, 'Row' => 3, 'Col' => 1, 'Ident' => 'Battery'],
+                ['Label' => 'Solar Rad.', 'Show' => true, 'Row' => 3, 'Col' => 2, 'Ident' => 'Solar_Radiation']
+            ];
+            IPS_SetProperty($this->InstanceID, 'HTMLVariableList', json_encode($default));
+            IPS_ApplyChanges($this->InstanceID);
+            return;
+        }
+
+        // Ensure the Dashboard variable is updated immediately after settings change
+        $this->GenerateHTMLDashboard();
     }
 
     public function ReceiveData($JSONString)
