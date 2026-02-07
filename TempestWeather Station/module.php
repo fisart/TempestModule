@@ -501,20 +501,32 @@ class TempestWeatherStation extends IPSModule
     {
         $config = $this->GetModuleConfig();
         $master = [];
-        foreach ($config['descriptions']['obs_st'] as $name) {
-            if ($name == 'Rohdaten') continue;
-            $master[str_replace([' ', '(', ')'], ['_', '', ''], $name)] = $name;
+        // Observations
+        if (isset($config['descriptions']['obs_st'])) {
+            foreach ($config['descriptions']['obs_st'] as $name) {
+                if ($name == 'Rohdaten') continue;
+                $master[str_replace([' ', '(', ')'], ['_', '', ''], $name)] = $name;
+            }
         }
-        foreach ($config['descriptions']['device_status'] as $name) {
-            if ($name == 'Rohdaten') continue;
-            $master['dev_' . str_replace(' ', '_', $name)] = 'Device: ' . $name;
+        // Device Status
+        if (isset($config['descriptions']['device_status'])) {
+            foreach ($config['descriptions']['device_status'] as $name) {
+                if ($name == 'Rohdaten') continue;
+                $master['dev_' . str_replace(' ', '_', $name)] = 'Device: ' . $name;
+            }
         }
-        foreach ($config['descriptions']['hub_status'] as $name) {
-            if ($name == 'radio_stats' || $name == 'Rohdaten') continue;
-            $master['hub_' . str_replace(' ', '_', $name)] = 'Hub: ' . $name;
+        // Hub Status
+        if (isset($config['descriptions']['hub_status'])) {
+            foreach ($config['descriptions']['hub_status'] as $name) {
+                if ($name == 'radio_stats' || $name == 'Rohdaten') continue;
+                $master['hub_' . str_replace(' ', '_', $name)] = 'Hub: ' . $name;
+            }
         }
-        foreach ($config['descriptions']['radio_stats'] as $name) {
-            $master['hub_radio_' . str_replace(' ', '_', $name)] = 'Radio: ' . $name;
+        // Radio Stats
+        if (isset($config['descriptions']['radio_stats'])) {
+            foreach ($config['descriptions']['radio_stats'] as $name) {
+                $master['hub_radio_' . str_replace(' ', '_', $name)] = 'Radio: ' . $name;
+            }
         }
         return $master;
     }
@@ -524,41 +536,37 @@ class TempestWeatherStation extends IPSModule
         $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
         $master = $this->GetMasterMetadata();
 
-        // PDF Section 3, Step 2: Initial Sync from Property to RAM-Cache (Attribute)
         $propertyData = $this->ReadPropertyString('HTMLVariableList');
-        $this->WriteAttributeString('HTMLVariableListBuffer', $propertyData);
-
         $values = json_decode($propertyData, true) ?: [];
         $existingIdents = array_column($values, 'Ident');
 
-        // Refresh labels for existing items and inject newly discovered variables
+        // Refresh labels for existing items
         foreach ($values as &$val) {
             if (isset($val['Ident']) && isset($master[$val['Ident']])) {
                 $val['Label'] = $master[$val['Ident']];
             }
         }
+        // Inject missing variables from metadata
         foreach ($master as $ident => $label) {
             if (!in_array($ident, $existingIdents)) {
                 $values[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
             }
         }
 
-        // PDF Section 3, Step 1: Move the list from 'elements' to 'actions'
+        // Move the list to Actions for persistence management
         foreach ($form['elements'] as $k => $panel) {
             if (isset($panel['caption']) && $panel['caption'] == 'Dashboard Customization') {
                 foreach ($panel['items'] as $i => $item) {
                     if (isset($item['name']) && $item['name'] == 'HTMLVariableList') {
                         $listComponent = $item;
                         $listComponent['values'] = $values;
-
-                        // PDF Section 3, Step 3: The onEdit path with Proxy-Object bypass (json_encode)
                         $listComponent['onEdit'] = "TMT_UpdateDashboardRow(\$id, json_encode(\$HTMLVariableList));";
 
                         $form['actions'][] = $listComponent;
                         unset($form['elements'][$k]['items'][$i]);
                     }
                 }
-                $form['elements'][$k]['items'] = array_values($form['elements'][$k]['items']);
+                $form['elements'][$k]['items'] = array_values($form['elements'][$k]['items'] ?? []);
             }
         }
 
@@ -575,16 +583,14 @@ class TempestWeatherStation extends IPSModule
 
     public function SaveSelections()
     {
-        // 1. Read the current selection from the RAM-Cache (Attribute)
         $buffer = $this->ReadAttributeString('HTMLVariableListBuffer');
+        if ($buffer === '' || $buffer === '[]') {
+            echo "No changes to save or buffer empty.";
+            return;
+        }
 
-        // 2. Commit to the permanent Instance Property
-        // This mirrors the "Zustand während der Sitzung" rule in your PDF
         IPS_SetProperty($this->InstanceID, 'HTMLVariableList', $buffer);
-
-        // 3. Save to disk and trigger ApplyChanges
         IPS_ApplyChanges($this->InstanceID);
-
         echo "Dashboard selection saved permanently.";
     }
 }
