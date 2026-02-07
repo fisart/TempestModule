@@ -25,7 +25,6 @@
             { "type": "CheckBox", "name": "EnableHTML", "caption": "Enable HTML Dashboard" },
             { "type": "SelectColor", "name": "HTMLBackgroundColor", "caption": "Background Color" },
             { "type": "SelectColor", "name": "HTMLFontColor", "caption": "Font Color" },
-            { "type": "Button", "label": "Sync Grid Variables", "onClick": "TMT_SyncDashboardList($id);" },
             {
                 "type": "List",
                 "name": "HTMLVariableList",
@@ -44,7 +43,7 @@
         ]}
     ],
     "actions": [
-        { "type": "Button", "label": "Update Profiles Now", "onClick": "TMT_UpdateProfiles($id);" },
-        { "type": "Label", "caption": "Note: Profiles are also automatically updated when you click 'Apply'." }
+        { "type": "Button", "label": "💾 SAVE DASHBOARD SELECTION", "onClick": "TMT_SaveSelections($id);" },
+        { "type": "Button", "label": "Update Profiles Now", "onClick": "TMT_UpdateProfiles($id);" }
     ]
 }

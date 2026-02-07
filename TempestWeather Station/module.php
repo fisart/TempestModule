@@ -66,9 +66,10 @@ class TempestWeatherStation extends IPSModule
         // Never delete this line!
         parent::ApplyChanges();
 
+        // 1. Standard module maintenance
         $this->UpdateProfiles();
 
-        // Regenerate the Dashboard visualization
+        // 2. Section 4 Summary Rule: Generate dashboard after property sync
         $this->GenerateHTMLDashboard();
     }
 
@@ -523,12 +524,14 @@ class TempestWeatherStation extends IPSModule
         $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
         $master = $this->GetMasterMetadata();
 
+        // PDF Section 3, Step 2: Initial Sync from Property to RAM-Cache (Attribute)
         $propertyData = $this->ReadPropertyString('HTMLVariableList');
         $this->WriteAttributeString('HTMLVariableListBuffer', $propertyData);
 
         $values = json_decode($propertyData, true) ?: [];
         $existingIdents = array_column($values, 'Ident');
 
+        // Refresh labels for existing items and inject newly discovered variables
         foreach ($values as &$val) {
             if (isset($val['Ident']) && isset($master[$val['Ident']])) {
                 $val['Label'] = $master[$val['Ident']];
@@ -540,13 +543,15 @@ class TempestWeatherStation extends IPSModule
             }
         }
 
+        // PDF Section 3, Step 1: Move the list from 'elements' to 'actions'
         foreach ($form['elements'] as $k => $panel) {
-            if (isset($panel['items']) && is_array($panel['items'])) {
+            if (isset($panel['caption']) && $panel['caption'] == 'Dashboard Customization') {
                 foreach ($panel['items'] as $i => $item) {
-                    // Fix: Robust check for the name key to prevent "Undefined array key" crash
                     if (isset($item['name']) && $item['name'] == 'HTMLVariableList') {
                         $listComponent = $item;
                         $listComponent['values'] = $values;
+
+                        // PDF Section 3, Step 3: The onEdit path with Proxy-Object bypass (json_encode)
                         $listComponent['onEdit'] = "TMT_UpdateDashboardRow(\$id, json_encode(\$HTMLVariableList));";
 
                         $form['actions'][] = $listComponent;
@@ -562,17 +567,24 @@ class TempestWeatherStation extends IPSModule
 
     public function UpdateDashboardRow(string $HTMLVariableList)
     {
-        // 1. Update the RAM-Cache (Attribute) for the current session
+        // PDF Section 3, Step 3: The onEdit handler
+        // Receives the UI state as a JSON string and writes it to the RAM-Cache
+        $this->SendDebug('UI-Update', $HTMLVariableList, 0);
         $this->WriteAttributeString('HTMLVariableListBuffer', $HTMLVariableList);
+    }
 
-        // 2. Commit to permanent storage (Property)
-        // This solves the persistence issue mentioned in your PDF Section 2B
-        IPS_SetProperty($this->InstanceID, 'HTMLVariableList', $HTMLVariableList);
+    public function SaveSelections()
+    {
+        // 1. Read the current selection from the RAM-Cache (Attribute)
+        $buffer = $this->ReadAttributeString('HTMLVariableListBuffer');
 
-        // 3. Apply changes to trigger a refresh of the variables and dashboard
-        // Since we are in an Action, we "Self-Apply" to save immediately
+        // 2. Commit to the permanent Instance Property
+        // This mirrors the "Zustand während der Sitzung" rule in your PDF
+        IPS_SetProperty($this->InstanceID, 'HTMLVariableList', $buffer);
+
+        // 3. Save to disk and trigger ApplyChanges
         IPS_ApplyChanges($this->InstanceID);
 
-        $this->SendDebug('UI-Persistence', 'Changes committed and applied.', 0);
+        echo "Dashboard selection saved permanently.";
     }
 }
