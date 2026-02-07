@@ -143,7 +143,7 @@ class TempestWeatherStation extends IPSModule
             }
 
             $varType = $config['profiles'][$profileIdent]['type'];
-            $this->MaintainVariable($ident, $name, $varType, $prefix . $profileIdent, $index, true);
+            $this->MaintainVariableSafe($ident, $name, $varType, $prefix . $profileIdent, $index, true);
             $this->HandleValueUpdate($ident, $val, $timestamp, $check);
         }
 
@@ -166,8 +166,17 @@ class TempestWeatherStation extends IPSModule
         $batteryID = @$this->GetIDForIdent('Battery');
         if (!$batteryID) return;
 
-        $history = AC_GetLoggedValues($archiveID, $batteryID, time() - 86400, time(), $nrPoints);
-        if (count($history) < 5) return;
+        // Ensure logging is enabled for the Battery variable (Required for Regression)
+        if (!AC_GetLoggingStatus($archiveID, $batteryID)) {
+            AC_SetLoggingStatus($archiveID, $batteryID, true);
+            IPS_ApplyChanges($archiveID);
+            return; // Exit and wait for next update so data can be logged
+        }
+
+        $history = @AC_GetLoggedValues($archiveID, $batteryID, time() - 86400, time(), $nrPoints);
+
+        // Fix: Check if history is an array to prevent Fatal Error on count()
+        if (!is_array($history) || count($history) < 5) return;
 
         $x = [];
         $y = [];
@@ -181,8 +190,8 @@ class TempestWeatherStation extends IPSModule
         $slope = $regression->getSlope();
 
         $config = $this->GetModuleConfig();
-        $statusID = $this->MaintainVariable('Battery_Status', 'Battery Status', $config['profiles']['battery_status']['type'], $prefix . 'battery_status', 23, true);
-        $slopeID = $this->MaintainVariable('Slope', 'Regression Slope', $config['profiles']['slope']['type'], $prefix . 'slope', 22, true);
+        $statusID = $this->MaintainVariableSafe('Battery_Status', 'Battery Status', $config['profiles']['battery_status']['type'], $prefix . 'battery_status', 23, true);
+        $slopeID = $this->MaintainVariableSafe('Slope', 'Regression Slope', $config['profiles']['slope']['type'], $prefix . 'slope', 22, true);
 
         if (!$statusID || !$slopeID) return;
 
@@ -190,7 +199,7 @@ class TempestWeatherStation extends IPSModule
         $isCharging = (bool)GetValue($statusID);
         $newState = $isCharging ? ($slope >= $triggerSlope && $slope >= $oldSlope) : ($slope >= $triggerSlope && $slope > $oldSlope);
 
-        $avgID = $this->MaintainVariable('Average', 'Average Voltage', $config['profiles']['volt']['type'], $prefix . 'volt', 20, true);
+        $avgID = $this->MaintainVariableSafe('Average', 'Average Voltage', $config['profiles']['volt']['type'], $prefix . 'volt', 20, true);
         if ($avgID) SetValue($avgID, $this->calculate_average($y));
 
         SetValue($slopeID, $slope);
@@ -424,5 +433,15 @@ class TempestWeatherStation extends IPSModule
                 IPS_SetVariableProfileAssociation($name, $assocValue, $text, '', $associations['Color'][$key] ?? -1);
             }
         }
+    }
+
+
+    private function MaintainVariableSafe($Ident, $Name, $Type, $Profile = "", $Position = 0, $Keep = true)
+    {
+        $varID = @$this->GetIDForIdent($Ident);
+        if ($varID && IPS_GetVariable($varID)['VariableType'] !== $Type) {
+            IPS_DeleteVariable($varID);
+        }
+        return $this->MaintainVariable($Ident, $Name, $Type, $Profile, $Position, $Keep);
     }
 }
