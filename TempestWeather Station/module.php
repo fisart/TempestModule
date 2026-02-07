@@ -64,7 +64,24 @@ class TempestWeatherStation extends IPSModule
 
         $this->UpdateProfiles();
 
-        // Refresh the dashboard immediately when "Apply" is clicked
+        // Fix: Restore missing labels for the UI list
+        $list = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
+        $master = $this->GetMasterMetadata();
+        $changed = false;
+
+        foreach ($list as &$item) {
+            if (empty($item['Label']) && isset($master[$item['Ident']])) {
+                $item['Label'] = $master[$item['Ident']];
+                $changed = true;
+            }
+        }
+
+        if ($changed) {
+            IPS_SetProperty($this->InstanceID, 'HTMLVariableList', json_encode($list));
+            IPS_ApplyChanges($this->InstanceID);
+            return;
+        }
+
         $this->GenerateHTMLDashboard();
     }
 
@@ -216,7 +233,8 @@ class TempestWeatherStation extends IPSModule
         $stationName = $this->ReadPropertyString('StationName');
         $bgColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLBackgroundColor'));
         $fontColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLFontColor'));
-        $varList = json_decode($this->ReadPropertyString('HTMLVariableList'), true);
+        $varList = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
+        $master = $this->GetMasterMetadata();
 
         $itemsHtml = "";
         foreach ($varList as $item) {
@@ -224,7 +242,7 @@ class TempestWeatherStation extends IPSModule
 
             $varID = @$this->GetIDForIdent($item['Ident']);
             $formatted = ($varID && IPS_VariableExists($varID)) ? GetValueFormatted($varID) : '--';
-            $label = $item['Label'] ?? $item['Ident'] ?? 'Unknown';
+            $label = (!empty($item['Label'])) ? $item['Label'] : ($master[$item['Ident']] ?? $item['Ident']);
 
             $itemsHtml .= "
             <div style='grid-row: {$item['Row']}; grid-column: {$item['Col']}; border: 1px solid rgba(255,255,255,0.1); padding: 1cqi; text-align: center; display: flex; flex-direction: column; justify-content: center; border-radius: 4px;'>
@@ -236,9 +254,7 @@ class TempestWeatherStation extends IPSModule
         $html = "
         <div style='container-type: inline-size; background-color: $bgColor; color: $fontColor; font-family: Segoe UI, sans-serif; height: 100%; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 2cqi; border-radius: 8px;'>
             <div style='text-align: center; font-size: 6cqi; font-weight: bold; padding-bottom: 2cqi; border-bottom: 1px solid rgba(255,255,255,0.2);'>$stationName</div>
-            <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1.5cqi; flex-grow: 1; margin-top: 2cqi;'>
-                $itemsHtml
-            </div>
+            <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1.5cqi; flex-grow: 1; margin-top: 2cqi;'>$itemsHtml</div>
         </div>";
 
         $this->SetValue('Dashboard', $html);
@@ -463,41 +479,22 @@ class TempestWeatherStation extends IPSModule
 
     public function SyncDashboardList()
     {
-        $config = $this->GetModuleConfig();
+        $masterMetadata = $this->GetMasterMetadata();
         $listString = $this->ReadPropertyString('HTMLVariableList');
         $currentList = json_decode($listString, true) ?: [];
         $newList = [];
+        $existingIdents = array_column($currentList, 'Ident');
 
-        // 1. Generate master map
-        $masterMetadata = [];
-        foreach ($config['descriptions']['obs_st'] as $name) {
-            if ($name == 'Rohdaten') continue;
-            $masterMetadata[str_replace([' ', '(', ')'], ['_', '', ''], $name)] = $name;
-        }
-        foreach ($config['descriptions']['device_status'] as $name) {
-            if ($name == 'Rohdaten') continue;
-            $masterMetadata['dev_' . str_replace(' ', '_', $name)] = 'Device: ' . $name;
-        }
-        foreach ($config['descriptions']['hub_status'] as $name) {
-            if ($name == 'radio_stats' || $name == 'Rohdaten') continue;
-            $masterMetadata['hub_' . str_replace(' ', '_', $name)] = 'Hub: ' . $name;
-        }
-        foreach ($config['descriptions']['radio_stats'] as $name) {
-            $masterMetadata['hub_radio_' . str_replace(' ', '_', $name)] = 'Radio: ' . $name;
-        }
-
-        // 2. Repair existing items and restore labels
-        $existingIdents = [];
+        // 1. Repair existing items and restore labels
         foreach ($currentList as $item) {
             $ident = $item['Ident'] ?? '';
             if ($ident && isset($masterMetadata[$ident])) {
-                $item['Label'] = $masterMetadata[$ident]; // Sync label
+                $item['Label'] = $masterMetadata[$ident];
                 $newList[] = $item;
-                $existingIdents[] = $ident;
             }
         }
 
-        // 3. Add new variables
+        // 2. Add new variables found in metadata
         foreach ($masterMetadata as $ident => $label) {
             if (!in_array($ident, $existingIdents)) {
                 $newList[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
@@ -506,6 +503,28 @@ class TempestWeatherStation extends IPSModule
 
         IPS_SetProperty($this->InstanceID, 'HTMLVariableList', json_encode($newList));
         IPS_ApplyChanges($this->InstanceID);
-        echo "Variable list synchronized successfully.";
+        echo "Variable list synchronized and labels restored.";
+    }
+
+    private function GetMasterMetadata()
+    {
+        $config = $this->GetModuleConfig();
+        $master = [];
+        foreach ($config['descriptions']['obs_st'] as $name) {
+            if ($name == 'Rohdaten') continue;
+            $master[str_replace([' ', '(', ')'], ['_', '', ''], $name)] = $name;
+        }
+        foreach ($config['descriptions']['device_status'] as $name) {
+            if ($name == 'Rohdaten') continue;
+            $master['dev_' . str_replace(' ', '_', $name)] = 'Device: ' . $name;
+        }
+        foreach ($config['descriptions']['hub_status'] as $name) {
+            if ($name == 'radio_stats' || $name == 'Rohdaten') continue;
+            $master['hub_' . str_replace(' ', '_', $name)] = 'Hub: ' . $name;
+        }
+        foreach ($config['descriptions']['radio_stats'] as $name) {
+            $master['hub_radio_' . str_replace(' ', '_', $name)] = 'Radio: ' . $name;
+        }
+        return $master;
     }
 }
