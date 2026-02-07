@@ -136,12 +136,19 @@ class TempestWeatherStation extends IPSModule
                 $val = $val * 3.6;
             }
 
+            // Fix: Check if profile key exists before accessing 'type'
+            if (!isset($config['profiles'][$profileIdent])) {
+                $this->SendDebug('Observation', 'Missing profile definition for: ' . $profileIdent, 0);
+                continue;
+            }
+
             $varType = $config['profiles'][$profileIdent]['type'];
-            $varID = $this->MaintainVariable($ident, $name, $varType, $prefix . $profileIdent, $index, true);
+            $this->MaintainVariable($ident, $name, $varType, $prefix . $profileIdent, $index, true);
             $this->HandleValueUpdate($ident, $val, $timestamp, $check);
         }
 
         $delta = time() - $timestamp;
+        $this->MaintainVariable('stamp_delta', 'stamp_delta', 1, $prefix . 'seconds', 26, true);
         $this->HandleValueUpdate('stamp_delta', $delta, $timestamp, 'NEW_VALUE');
 
         if ($this->ReadPropertyBoolean('ExperimentalRegression')) {
@@ -378,6 +385,7 @@ class TempestWeatherStation extends IPSModule
                 'energy' => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' W/m²', 'min' => 0, 'max' => 1000, 'step' => 1],
                 'lux' => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' Lx', 'min' => 0, 'max' => 120000, 'step' => 1],
                 'index' => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' UVI', 'min' => 0, 'max' => 15, 'step' => 0.01],
+                'mm' => ['type' => 2, 'digits' => 6, 'prefix' => '', 'suffix' => ' mm', 'min' => 0, 'max' => 100, 'step' => 0.000001],
                 'km' => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' km', 'min' => 0, 'max' => 100, 'step' => 0.01],
                 'rssi' => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' dB', 'min' => -100, 'max' => 0, 'step' => 1],
                 'seconds' => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' s', 'min' => 0, 'max' => 999999999, 'step' => 1],
