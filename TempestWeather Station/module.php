@@ -216,12 +216,20 @@ class TempestWeatherStation extends IPSModule
         $itemsHtml = "";
         foreach ($varList as $item) {
             if (!$item['Show']) continue;
+
             $varID = @$this->GetIDForIdent($item['Ident']);
-            $formatted = ($varID) ? GetValueFormatted($varID) : '--';
+            if ($varID) {
+                $formatted = GetValueFormatted($varID);
+            } else {
+                $formatted = '--';
+            }
+
+            // Fix: Use null coalescing to prevent "Undefined array key" warnings
+            $label = $item['Label'] ?? $item['Ident'] ?? 'Unknown';
 
             $itemsHtml .= "
             <div style='grid-row: {$item['Row']}; grid-column: {$item['Col']}; border: 1px solid rgba(255,255,255,0.1); padding: 1cqi; text-align: center; display: flex; flex-direction: column; justify-content: center; border-radius: 4px;'>
-                <div style='font-size: 3cqi; opacity: 0.8; margin-bottom: 0.2cqi;'>{$item['Label']}</div>
+                <div style='font-size: 3cqi; opacity: 0.8; margin-bottom: 0.2cqi;'>$label</div>
                 <div style='font-size: 5cqi; font-weight: bold;'>$formatted</div>
             </div>";
         }
