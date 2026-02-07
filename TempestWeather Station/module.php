@@ -28,6 +28,7 @@ class TempestWeatherStation extends IPSModule
 
         // Visualization & Dashboard
         $this->RegisterPropertyBoolean('EnableHTML', true);
+        $this->RegisterPropertyInteger('HTMLUpdateInterval', 0);
         $this->RegisterPropertyInteger('HTMLBackgroundColor', 0x222222);
         $this->RegisterPropertyInteger('HTMLFontColor', 0xFFFFFF);
         $this->RegisterPropertyString('HTMLVariableList', json_encode([
@@ -43,6 +44,9 @@ class TempestWeatherStation extends IPSModule
         $this->RegisterAttributeString('HTMLVariableListBuffer', '[]');
 
         $this->RegisterVariableString('Dashboard', 'Dashboard', '~HTMLBox', 150);
+
+        // Register Timer for Dashboard Refresh
+        $this->RegisterTimer('UpdateDashboardTimer', 0, 'TMT_UpdateDashboard($_IPS[\'TARGET\']);');
 
         // Granular Selectors
         $this->RegisterPropertyBoolean('Var_Wind', true);
@@ -66,10 +70,12 @@ class TempestWeatherStation extends IPSModule
         // Never delete this line!
         parent::ApplyChanges();
 
-        // 1. Standard module maintenance
         $this->UpdateProfiles();
 
-        // 2. Section 4 Summary Rule: Generate dashboard after property sync
+        // Manage Dashboard Timer
+        $interval = $this->ReadPropertyBoolean('EnableHTML') ? $this->ReadPropertyInteger('HTMLUpdateInterval') : 0;
+        $this->SetTimerInterval('UpdateDashboardTimer', $interval * 1000);
+
         $this->GenerateHTMLDashboard();
     }
 
@@ -633,5 +639,10 @@ class TempestWeatherStation extends IPSModule
         IPS_ApplyChanges($this->InstanceID);
 
         echo "Dashboard selection saved and applied.";
+    }
+
+    public function UpdateDashboard()
+    {
+        $this->GenerateHTMLDashboard();
     }
 }

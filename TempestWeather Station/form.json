@@ -25,6 +25,7 @@
             { "type": "CheckBox", "name": "EnableHTML", "caption": "Enable HTML Dashboard" },
             { "type": "SelectColor", "name": "HTMLBackgroundColor", "caption": "Background Color" },
             { "type": "SelectColor", "name": "HTMLFontColor", "caption": "Font Color" },
+            { "type": "NumberSpinner", "name": "HTMLUpdateInterval", "caption": "Update Interval (seconds)", "minimum": 0 },
             {
                 "type": "List",
                 "name": "HTMLVariableList",
