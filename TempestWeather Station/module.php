@@ -536,28 +536,33 @@ class TempestWeatherStation extends IPSModule
         $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
         $master = $this->GetMasterMetadata();
 
-        $propertyData = $this->ReadPropertyString('HTMLVariableList');
-        $values = json_decode($propertyData, true) ?: [];
+        // Blueprint 2.0: Read from RAM-Cache (Attribute) first to preserve active session edits
+        $bufferData = $this->ReadAttributeString('HTMLVariableListBuffer');
+        $values = json_decode($bufferData, true) ?: [];
+
+        // If RAM-Cache is empty (e.g. first time opening), load from permanent Property
+        if (empty($values)) {
+            $values = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
+        }
+
         $existingIdents = array_column($values, 'Ident');
 
-        // 1. Refresh labels for existing items
+        // Refresh labels and inject newly discovered variables into the session values
         foreach ($values as &$val) {
             if (isset($val['Ident']) && isset($master[$val['Ident']])) {
                 $val['Label'] = $master[$val['Ident']];
             }
         }
-        // 2. Inject missing variables from metadata
         foreach ($master as $ident => $label) {
             if (!in_array($ident, $existingIdents)) {
                 $values[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
             }
         }
 
-        // 3. Section 3, Step 2: Write the FULL discovered list to RAM-Cache
-        // This ensures the "Save" button has a complete dataset to work with
+        // Update the RAM-Cache with the current merged state
         $this->WriteAttributeString('HTMLVariableListBuffer', json_encode($values));
 
-        // 4. Section 3, Step 1: Move the list to Actions
+        // Move the list to Actions for stateless management
         foreach ($form['elements'] as $k => $panel) {
             if (isset($panel['caption']) && $panel['caption'] == 'Dashboard Customization') {
                 foreach ($panel['items'] as $i => $item) {
@@ -582,30 +587,29 @@ class TempestWeatherStation extends IPSModule
         $newData = json_decode($HTMLVariableList, true);
         if (!is_array($newData)) return;
 
-        // Ensure we handle single row vs multi-row wraps
         if (isset($newData['Ident'])) {
             $newData = [$newData];
         }
 
-        // 1. Get the current full state from RAM-Cache
         $buffer = json_decode($this->ReadAttributeString('HTMLVariableListBuffer'), true) ?: [];
 
-        // 2. Convert to map for merging
         $map = [];
         foreach ($buffer as $item) {
             if (isset($item['Ident'])) $map[$item['Ident']] = $item;
         }
 
-        // 3. Update only the changed row(s)
         foreach ($newData as $row) {
             if (isset($row['Ident'])) {
+                // Blueprint 2.0: Explicit casting to satisfy NumberSpinner and Sorting
+                $row['Row'] = (int)$row['Row'];
+                $row['Col'] = (int)$row['Col'];
+                $row['Show'] = (bool)$row['Show'];
                 $map[$row['Ident']] = $row;
             }
         }
 
-        // 4. Write the full merged list back to RAM-Cache
         $this->WriteAttributeString('HTMLVariableListBuffer', json_encode(array_values($map)));
-        $this->SendDebug('UI-Update', 'RAM-Cache updated via merge.', 0);
+        $this->SendDebug('UI-Update', 'RAM-Cache updated and types cast.', 0);
     }
 
     public function SaveSelections()
