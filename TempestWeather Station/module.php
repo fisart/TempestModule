@@ -67,50 +67,48 @@ class TempestWeatherStation extends IPSModule
         $config = $this->GetModuleConfig();
         $listString = $this->ReadPropertyString('HTMLVariableList');
         $currentList = json_decode($listString, true) ?: [];
-        $existingIdents = array_column($currentList, 'Ident');
-        $newList = $currentList;
+        $newList = [];
         $hasChanged = false;
 
-        // 1. Map all potential variables and their Idents
-        $potentialVariables = [];
-
-        // Observations & Technical (obs_st)
+        // 1. Generate the master map of all potential variables
+        $masterMetadata = [];
         foreach ($config['descriptions']['obs_st'] as $name) {
             if ($name == 'Rohdaten') continue;
-            $potentialVariables[] = ['Label' => $name, 'Ident' => str_replace([' ', '(', ')'], ['_', '', ''], $name)];
+            $masterMetadata[str_replace([' ', '(', ')'], ['_', '', ''], $name)] = $name;
         }
-
-        // Device Status
         foreach ($config['descriptions']['device_status'] as $name) {
-            $potentialVariables[] = ['Label' => 'Device: ' . $name, 'Ident' => 'dev_' . str_replace(' ', '_', $name)];
+            $masterMetadata['dev_' . str_replace(' ', '_', $name)] = 'Device: ' . $name;
         }
-
-        // Hub Status
         foreach ($config['descriptions']['hub_status'] as $name) {
             if ($name == 'radio_stats') continue;
-            $potentialVariables[] = ['Label' => 'Hub: ' . $name, 'Ident' => 'hub_' . str_replace(' ', '_', $name)];
+            $masterMetadata['hub_' . str_replace(' ', '_', $name)] = 'Hub: ' . $name;
         }
-
-        // Radio Stats
         foreach ($config['descriptions']['radio_stats'] as $name) {
-            $potentialVariables[] = ['Label' => 'Radio: ' . $name, 'Ident' => 'hub_radio_' . str_replace(' ', '_', $name)];
+            $masterMetadata['hub_radio_' . str_replace(' ', '_', $name)] = 'Radio: ' . $name;
         }
 
-        // 2. Add missing variables to the list (Hidden by default)
-        foreach ($potentialVariables as $var) {
-            if (!in_array($var['Ident'], $existingIdents)) {
-                $newList[] = [
-                    'Label' => $var['Label'],
-                    'Show'  => false,
-                    'Row'   => 1,
-                    'Col'   => 1,
-                    'Ident' => $var['Ident']
-                ];
+        // 2. Repair existing entries and remove duplicates/orphans
+        $existingIdents = [];
+        foreach ($currentList as $item) {
+            $ident = $item['Ident'] ?? '';
+            if ($ident && isset($masterMetadata[$ident])) {
+                $item['Label'] = $masterMetadata[$ident]; // Force restore correct label
+                $newList[] = $item;
+                $existingIdents[] = $ident;
+            } else {
+                $hasChanged = true; // Orphaned or broken item
+            }
+        }
+
+        // 3. Add missing variables to the list
+        foreach ($masterMetadata as $ident => $label) {
+            if (!in_array($ident, $existingIdents)) {
+                $newList[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
                 $hasChanged = true;
             }
         }
 
-        // 3. Save property if new variables were found
+        // 4. Save and restart if configuration was repaired
         if ($hasChanged || empty($currentList)) {
             IPS_SetProperty($this->InstanceID, 'HTMLVariableList', json_encode($newList));
             IPS_ApplyChanges($this->InstanceID);
@@ -272,16 +270,10 @@ class TempestWeatherStation extends IPSModule
 
         $itemsHtml = "";
         foreach ($varList as $item) {
-            if (!$item['Show']) continue;
+            if (!($item['Show'] ?? false)) continue;
 
             $varID = @$this->GetIDForIdent($item['Ident']);
-            if ($varID) {
-                $formatted = GetValueFormatted($varID);
-            } else {
-                $formatted = '--';
-            }
-
-            // Fix: Use null coalescing to prevent "Undefined array key" warnings
+            $formatted = ($varID && IPS_VariableExists($varID)) ? GetValueFormatted($varID) : '--';
             $label = $item['Label'] ?? $item['Ident'] ?? 'Unknown';
 
             $itemsHtml .= "
@@ -294,7 +286,9 @@ class TempestWeatherStation extends IPSModule
         $html = "
         <div style='container-type: inline-size; background-color: $bgColor; color: $fontColor; font-family: Segoe UI, sans-serif; height: 100%; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 2cqi; border-radius: 8px;'>
             <div style='text-align: center; font-size: 6cqi; font-weight: bold; padding-bottom: 2cqi; border-bottom: 1px solid rgba(255,255,255,0.2);'>$stationName</div>
-            <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(10cqi, 1fr)); grid-auto-rows: 1fr; gap: 1.5cqi; flex-grow: 1; margin-top: 2cqi;'>$itemsHtml</div>
+            <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1.5cqi; flex-grow: 1; margin-top: 2cqi;'>
+                $itemsHtml
+            </div>
         </div>";
 
         $this->SetValue('Dashboard', $html);
