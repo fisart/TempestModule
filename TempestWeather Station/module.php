@@ -64,16 +64,19 @@ class TempestWeatherStation extends IPSModule
 
         $this->UpdateProfiles();
 
-        // Fix: Restore missing labels for the UI list
+        // Fix: Force synchronize labels from metadata every time Apply is clicked
         $list = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
         $master = $this->GetMasterMetadata();
         $changed = false;
 
         foreach ($list as &$item) {
-            // Fix: Added isset($item['Ident']) check to prevent line 73 warning
-            if (isset($item['Ident']) && empty($item['Label']) && isset($master[$item['Ident']])) {
-                $item['Label'] = $master[$item['Ident']];
-                $changed = true;
+            $ident = $item['Ident'] ?? '';
+            if ($ident && isset($master[$ident])) {
+                // Always overwrite the Label with the Master Metadata to fix browser-omitted readOnly columns
+                if (($item['Label'] ?? '') !== $master[$ident]) {
+                    $item['Label'] = $master[$ident];
+                    $changed = true;
+                }
             }
         }
 
@@ -85,6 +88,8 @@ class TempestWeatherStation extends IPSModule
 
         $this->GenerateHTMLDashboard();
     }
+
+
 
     public function ReceiveData($JSONString)
     {
@@ -487,7 +492,7 @@ class TempestWeatherStation extends IPSModule
         $newList = [];
         $existingIdents = array_column($currentList, 'Ident');
 
-        // 1. Repair existing items and restore labels
+        // 1. Refresh labels for all existing items
         foreach ($currentList as $item) {
             $ident = $item['Ident'] ?? '';
             if ($ident && isset($masterMetadata[$ident])) {
@@ -496,7 +501,7 @@ class TempestWeatherStation extends IPSModule
             }
         }
 
-        // 2. Add new variables found in metadata
+        // 2. Add any newly discovered variables
         foreach ($masterMetadata as $ident => $label) {
             if (!in_array($ident, $existingIdents)) {
                 $newList[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
@@ -505,7 +510,7 @@ class TempestWeatherStation extends IPSModule
 
         IPS_SetProperty($this->InstanceID, 'HTMLVariableList', json_encode($newList));
         IPS_ApplyChanges($this->InstanceID);
-        echo "Variable list synchronized and labels restored.";
+        echo "Configuration grid synchronized and labels refreshed.";
     }
 
     private function GetMasterMetadata()
