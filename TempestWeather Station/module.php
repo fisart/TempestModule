@@ -543,7 +543,7 @@ class TempestWeatherStation extends IPSModule
 
         // Refresh labels and add missing variables for the UI
         foreach ($values as &$val) {
-            if (isset($master[$val['Ident']])) {
+            if (isset($val['Ident']) && isset($master[$val['Ident']])) {
                 $val['Label'] = $master[$val['Ident']];
             }
         }
@@ -554,11 +554,11 @@ class TempestWeatherStation extends IPSModule
         }
 
         // Move the list to Actions (Stateless UI from PDF Section 3, Step 1)
-        // We find the list in elements, remove it, and move it to actions
         foreach ($form['elements'] as $k => $panel) {
-            if ($panel['caption'] == 'Dashboard Customization') {
+            if (isset($panel['caption']) && $panel['caption'] == 'Dashboard Customization') {
                 foreach ($panel['items'] as $i => $item) {
-                    if ($item['name'] == 'HTMLVariableList') {
+                    // Fix: Added isset($item['name']) to handle Buttons/Labels without names
+                    if (isset($item['name']) && $item['name'] == 'HTMLVariableList') {
                         $listComponent = $item;
                         $listComponent['values'] = $values;
                         // Add the onEdit handler (PDF Section 3, Step 3)
