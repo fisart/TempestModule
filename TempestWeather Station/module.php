@@ -562,7 +562,7 @@ class TempestWeatherStation extends IPSModule
                         $listComponent = $item;
                         $listComponent['values'] = $values;
                         // Add the onEdit handler (PDF Section 3, Step 3)
-                        $listComponent['onEdit'] = "TMT_UpdateDashboardRow(\$id, \$HTMLVariableList);";
+                        $listComponent['onEdit'] = "TMT_UpdateDashboardRow(\$id, json_encode(\$HTMLVariableList));";
 
                         $form['actions'][] = $listComponent;
                         unset($form['elements'][$k]['items'][$i]);
@@ -575,7 +575,7 @@ class TempestWeatherStation extends IPSModule
         return json_encode($form);
     }
 
-    public function UpdateDashboardRow($HTMLVariableList)
+    public function UpdateDashboardRow(string $HTMLVariableList)
     {
         // Section 3, Step 2: Write to RAM-Cache (Attribute) immediately on every click
         $this->SendDebug('UI-Update', $HTMLVariableList, 0);
