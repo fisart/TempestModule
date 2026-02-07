@@ -72,7 +72,7 @@ class TempestWeatherStation extends IPSModule
 
         $this->UpdateProfiles();
 
-        // Manage Dashboard Timer
+        // Manage Dashboard Timer (v2.10.0 logic)
         $interval = $this->ReadPropertyBoolean('EnableHTML') ? $this->ReadPropertyInteger('HTMLUpdateInterval') : 0;
         $this->SetTimerInterval('UpdateDashboardTimer', $interval * 1000);
 
