@@ -64,63 +64,7 @@ class TempestWeatherStation extends IPSModule
 
         $this->UpdateProfiles();
 
-        $config = $this->GetModuleConfig();
-        $listString = $this->ReadPropertyString('HTMLVariableList');
-        $currentList = json_decode($listString, true) ?: [];
-        $newList = [];
-        $hasChanged = false;
-
-        // 1. Generate the master map of all current potential variables from metadata
-        $masterMetadata = [];
-        foreach ($config['descriptions']['obs_st'] as $name) {
-            if ($name == 'Rohdaten') continue;
-            $masterMetadata[str_replace([' ', '(', ')'], ['_', '', ''], $name)] = $name;
-        }
-        foreach ($config['descriptions']['device_status'] as $name) {
-            if ($name == 'Rohdaten') continue;
-            $masterMetadata['dev_' . str_replace(' ', '_', $name)] = 'Device: ' . $name;
-        }
-        foreach ($config['descriptions']['hub_status'] as $name) {
-            if ($name == 'radio_stats' || $name == 'Rohdaten') continue;
-            $masterMetadata['hub_' . str_replace(' ', '_', $name)] = 'Hub: ' . $name;
-        }
-        foreach ($config['descriptions']['radio_stats'] as $name) {
-            $masterMetadata['hub_radio_' . str_replace(' ', '_', $name)] = 'Radio: ' . $name;
-        }
-
-        // 2. Sync existing list with metadata to fix blank labels or remove orphans
-        $existingIdents = [];
-        foreach ($currentList as $item) {
-            $ident = $item['Ident'] ?? '';
-            // If the variable is still valid in current metadata, keep it and refresh the label
-            if ($ident && isset($masterMetadata[$ident])) {
-                if (($item['Label'] ?? '') !== $masterMetadata[$ident]) {
-                    $item['Label'] = $masterMetadata[$ident];
-                    $hasChanged = true;
-                }
-                $newList[] = $item;
-                $existingIdents[] = $ident;
-            } else {
-                // If it's not in metadata (like Rohdaten), it's an orphan; mark changed to remove it
-                $hasChanged = true;
-            }
-        }
-
-        // 3. Add any new variables found in metadata that aren't in the list yet
-        foreach ($masterMetadata as $ident => $label) {
-            if (!in_array($ident, $existingIdents)) {
-                $newList[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
-                $hasChanged = true;
-            }
-        }
-
-        // 4. Only save and restart if the list was modified, expanded, or empty
-        if ($hasChanged || empty($currentList)) {
-            IPS_SetProperty($this->InstanceID, 'HTMLVariableList', json_encode($newList));
-            IPS_ApplyChanges($this->InstanceID);
-            return;
-        }
-
+        // Refresh the dashboard immediately when "Apply" is clicked
         $this->GenerateHTMLDashboard();
     }
 
@@ -514,5 +458,54 @@ class TempestWeatherStation extends IPSModule
             IPS_DeleteVariable($varID);
         }
         return $this->MaintainVariable($Ident, $Name, $Type, $Profile, $Position, $Keep);
+    }
+
+
+    public function SyncDashboardList()
+    {
+        $config = $this->GetModuleConfig();
+        $listString = $this->ReadPropertyString('HTMLVariableList');
+        $currentList = json_decode($listString, true) ?: [];
+        $newList = [];
+
+        // 1. Generate master map
+        $masterMetadata = [];
+        foreach ($config['descriptions']['obs_st'] as $name) {
+            if ($name == 'Rohdaten') continue;
+            $masterMetadata[str_replace([' ', '(', ')'], ['_', '', ''], $name)] = $name;
+        }
+        foreach ($config['descriptions']['device_status'] as $name) {
+            if ($name == 'Rohdaten') continue;
+            $masterMetadata['dev_' . str_replace(' ', '_', $name)] = 'Device: ' . $name;
+        }
+        foreach ($config['descriptions']['hub_status'] as $name) {
+            if ($name == 'radio_stats' || $name == 'Rohdaten') continue;
+            $masterMetadata['hub_' . str_replace(' ', '_', $name)] = 'Hub: ' . $name;
+        }
+        foreach ($config['descriptions']['radio_stats'] as $name) {
+            $masterMetadata['hub_radio_' . str_replace(' ', '_', $name)] = 'Radio: ' . $name;
+        }
+
+        // 2. Repair existing items and restore labels
+        $existingIdents = [];
+        foreach ($currentList as $item) {
+            $ident = $item['Ident'] ?? '';
+            if ($ident && isset($masterMetadata[$ident])) {
+                $item['Label'] = $masterMetadata[$ident]; // Sync label
+                $newList[] = $item;
+                $existingIdents[] = $ident;
+            }
+        }
+
+        // 3. Add new variables
+        foreach ($masterMetadata as $ident => $label) {
+            if (!in_array($ident, $existingIdents)) {
+                $newList[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
+            }
+        }
+
+        IPS_SetProperty($this->InstanceID, 'HTMLVariableList', json_encode($newList));
+        IPS_ApplyChanges($this->InstanceID);
+        echo "Variable list synchronized successfully.";
     }
 }

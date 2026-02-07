@@ -25,11 +25,13 @@
             { "type": "CheckBox", "name": "EnableHTML", "caption": "Enable HTML Dashboard" },
             { "type": "SelectColor", "name": "HTMLBackgroundColor", "caption": "Background Color" },
             { "type": "SelectColor", "name": "HTMLFontColor", "caption": "Font Color" },
+            { "type": "Button", "label": "Sync Grid Variables", "onClick": "TMT_SyncDashboardList($id);" },
             {
                 "type": "List",
                 "name": "HTMLVariableList",
                 "caption": "Grid Configuration (Row/Col starts at 1)",
-                "add": false, "delete": false,
+                "add": false,
+                "delete": false,
                 "sort": { "column": "Row", "direction": "ascending" },
                 "columns": [
                     { "caption": "Variable", "name": "Label", "width": "180px", "readOnly": true },
@@ -39,8 +41,7 @@
                     { "caption": "Ident", "name": "Ident", "width": "0px" }
                 ]
             }
-        ]
-        }
+        ]}
     ],
     "actions": [
         { "type": "Button", "label": "Update Profiles Now", "onClick": "TMT_UpdateProfiles($id);" },
