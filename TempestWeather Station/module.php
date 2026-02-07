@@ -225,7 +225,7 @@ class TempestWeatherStation extends IPSModule
                 $value = (float)$value;
                 break;
             case 3:
-                $value = (string)$value;
+                $value = $value = is_array($value) ? json_encode($value) : (string)$value;
                 break;
         }
 
@@ -534,8 +534,10 @@ class TempestWeatherStation extends IPSModule
                     $this->HandleValueUpdate($subIdent, $subVal, $timestamp, $check);
                 }
             } else {
+                // Fix: Skip complex arrays (like fs or mqtt_stats) to prevent 'Array to string conversion' errors
+                if (is_array($val)) continue;
+
                 $ident = 'hub_' . str_replace(' ', '_', $name);
-                // Fix: Added dynamic type lookup here as well
                 $profileIdent = $this->GetProfileForName($name);
                 $this->MaintainVariable($ident, $name, $config['profiles'][$profileIdent]['type'], $prefix . $profileIdent, $index + 80, true);
                 $this->HandleValueUpdate($ident, $val, $timestamp, $check);
@@ -553,7 +555,7 @@ class TempestWeatherStation extends IPSModule
         $this->MaintainVariable('Wind_Speed', 'Wind Speed', 2, $prefix . 'km_pro_stunde', 10, true);
         $this->HandleValueUpdate('Wind_Speed', $data['ob'][1] * 3.6, $timestamp, $check);
 
-        $this->MaintainVariable('Wind_Direction_Rapid', 'Wind Direction (Rapid)', 1, $prefix . 'wind_direction', 11, true);
+        $this->RegisterVariableFloat('Wind_Direction_Rapid', 'Wind Direction (Rapid)', $prefix . 'wind_direction', 11);
         $this->HandleValueUpdate('Wind_Direction_Rapid', $data['ob'][2], $timestamp, $check);
     }
 
