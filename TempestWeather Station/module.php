@@ -38,6 +38,10 @@ class TempestWeatherStation extends IPSModule
             ['Label' => 'Battery', 'Show' => true, 'Row' => 3, 'Col' => 1, 'Ident' => 'Battery'],
             ['Label' => 'Solar Rad.', 'Show' => true, 'Row' => 3, 'Col' => 2, 'Ident' => 'Solar_Radiation']
         ]));
+
+        // RAM-Caching via Attribute (Blueprint Strategy Section 3, Step 2)
+        $this->RegisterAttributeString('HTMLVariableListBuffer', '[]');
+
         $this->RegisterVariableString('Dashboard', 'Dashboard', '~HTMLBox', 150);
 
         // Granular Selectors
@@ -64,26 +68,16 @@ class TempestWeatherStation extends IPSModule
 
         $this->UpdateProfiles();
 
-        // Fix: Force synchronize labels from metadata every time Apply is clicked
-        $list = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
-        $master = $this->GetMasterMetadata();
-        $changed = false;
+        // Final Synchronization from Attribute (RAM) to Property (Disk)
+        // This prevents the "Zwei-Welten-Falle" (PDF Section 2B)
+        $buffer = $this->ReadAttributeString('HTMLVariableListBuffer');
+        $property = $this->ReadPropertyString('HTMLVariableList');
 
-        foreach ($list as &$item) {
-            $ident = $item['Ident'] ?? '';
-            if ($ident && isset($master[$ident])) {
-                // Always overwrite the Label with the Master Metadata to fix browser-omitted readOnly columns
-                if (($item['Label'] ?? '') !== $master[$ident]) {
-                    $item['Label'] = $master[$ident];
-                    $changed = true;
-                }
-            }
-        }
-
-        if ($changed) {
-            IPS_SetProperty($this->InstanceID, 'HTMLVariableList', json_encode($list));
+        // Only update property and restart if the RAM-Cache differs from stored data
+        if ($buffer !== $property && $buffer !== '[]' && $buffer !== '') {
+            IPS_SetProperty($this->InstanceID, 'HTMLVariableList', $buffer);
             IPS_ApplyChanges($this->InstanceID);
-            return;
+            return; // Terminate this cycle; the next automatic ApplyChanges will proceed
         }
 
         $this->GenerateHTMLDashboard();
@@ -533,5 +527,58 @@ class TempestWeatherStation extends IPSModule
             $master['hub_radio_' . str_replace(' ', '_', $name)] = 'Radio: ' . $name;
         }
         return $master;
+    }
+
+    public function GetConfigurationForm()
+    {
+        $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
+        $master = $this->GetMasterMetadata();
+
+        // Sync Property to Attribute (Initial Sync from PDF Section 3, Step 2)
+        $propertyData = $this->ReadPropertyString('HTMLVariableList');
+        $this->WriteAttributeString('HTMLVariableListBuffer', $propertyData);
+
+        $values = json_decode($propertyData, true) ?: [];
+        $existingIdents = array_column($values, 'Ident');
+
+        // Refresh labels and add missing variables for the UI
+        foreach ($values as &$val) {
+            if (isset($master[$val['Ident']])) {
+                $val['Label'] = $master[$val['Ident']];
+            }
+        }
+        foreach ($master as $ident => $label) {
+            if (!in_array($ident, $existingIdents)) {
+                $values[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
+            }
+        }
+
+        // Move the list to Actions (Stateless UI from PDF Section 3, Step 1)
+        // We find the list in elements, remove it, and move it to actions
+        foreach ($form['elements'] as $k => $panel) {
+            if ($panel['caption'] == 'Dashboard Customization') {
+                foreach ($panel['items'] as $i => $item) {
+                    if ($item['name'] == 'HTMLVariableList') {
+                        $listComponent = $item;
+                        $listComponent['values'] = $values;
+                        // Add the onEdit handler (PDF Section 3, Step 3)
+                        $listComponent['onEdit'] = "TMT_UpdateDashboardRow(\$id, \$HTMLVariableList);";
+
+                        $form['actions'][] = $listComponent;
+                        unset($form['elements'][$k]['items'][$i]);
+                    }
+                }
+                $form['elements'][$k]['items'] = array_values($form['elements'][$k]['items']);
+            }
+        }
+
+        return json_encode($form);
+    }
+
+    public function UpdateDashboardRow($HTMLVariableList)
+    {
+        // Section 3, Step 2: Write to RAM-Cache (Attribute) immediately on every click
+        $this->SendDebug('UI-Update', $HTMLVariableList, 0);
+        $this->WriteAttributeString('HTMLVariableListBuffer', $HTMLVariableList);
     }
 }
