@@ -64,25 +64,59 @@ class TempestWeatherStation extends IPSModule
 
         $this->UpdateProfiles();
 
-        // Self-healing: Reset the Variable List if it is empty or corrupted (missing Ident keys)
+        $config = $this->GetModuleConfig();
         $listString = $this->ReadPropertyString('HTMLVariableList');
-        $list = json_decode($listString, true);
+        $currentList = json_decode($listString, true) ?: [];
+        $existingIdents = array_column($currentList, 'Ident');
+        $newList = $currentList;
+        $hasChanged = false;
 
-        if (empty($list) || (isset($list[0]) && !isset($list[0]['Ident']))) {
-            $default = [
-                ['Label' => 'Temperature', 'Show' => true, 'Row' => 1, 'Col' => 1, 'Ident' => 'Air_Temperature'],
-                ['Label' => 'Humidity', 'Show' => true, 'Row' => 1, 'Col' => 2, 'Ident' => 'Relative_Humidity'],
-                ['Label' => 'Pressure', 'Show' => true, 'Row' => 2, 'Col' => 1, 'Ident' => 'Station_Pressure'],
-                ['Label' => 'Wind Avg', 'Show' => true, 'Row' => 2, 'Col' => 2, 'Ident' => 'Wind_Avg'],
-                ['Label' => 'Battery', 'Show' => true, 'Row' => 3, 'Col' => 1, 'Ident' => 'Battery'],
-                ['Label' => 'Solar Rad.', 'Show' => true, 'Row' => 3, 'Col' => 2, 'Ident' => 'Solar_Radiation']
-            ];
-            IPS_SetProperty($this->InstanceID, 'HTMLVariableList', json_encode($default));
+        // 1. Map all potential variables and their Idents
+        $potentialVariables = [];
+
+        // Observations & Technical (obs_st)
+        foreach ($config['descriptions']['obs_st'] as $name) {
+            if ($name == 'Rohdaten') continue;
+            $potentialVariables[] = ['Label' => $name, 'Ident' => str_replace([' ', '(', ')'], ['_', '', ''], $name)];
+        }
+
+        // Device Status
+        foreach ($config['descriptions']['device_status'] as $name) {
+            $potentialVariables[] = ['Label' => 'Device: ' . $name, 'Ident' => 'dev_' . str_replace(' ', '_', $name)];
+        }
+
+        // Hub Status
+        foreach ($config['descriptions']['hub_status'] as $name) {
+            if ($name == 'radio_stats') continue;
+            $potentialVariables[] = ['Label' => 'Hub: ' . $name, 'Ident' => 'hub_' . str_replace(' ', '_', $name)];
+        }
+
+        // Radio Stats
+        foreach ($config['descriptions']['radio_stats'] as $name) {
+            $potentialVariables[] = ['Label' => 'Radio: ' . $name, 'Ident' => 'hub_radio_' . str_replace(' ', '_', $name)];
+        }
+
+        // 2. Add missing variables to the list (Hidden by default)
+        foreach ($potentialVariables as $var) {
+            if (!in_array($var['Ident'], $existingIdents)) {
+                $newList[] = [
+                    'Label' => $var['Label'],
+                    'Show'  => false,
+                    'Row'   => 1,
+                    'Col'   => 1,
+                    'Ident' => $var['Ident']
+                ];
+                $hasChanged = true;
+            }
+        }
+
+        // 3. Save property if new variables were found
+        if ($hasChanged || empty($currentList)) {
+            IPS_SetProperty($this->InstanceID, 'HTMLVariableList', json_encode($newList));
             IPS_ApplyChanges($this->InstanceID);
             return;
         }
 
-        // Ensure the Dashboard variable is updated immediately after settings change
         $this->GenerateHTMLDashboard();
     }
 
