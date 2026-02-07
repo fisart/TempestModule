@@ -224,28 +224,29 @@ class TempestWeatherStation extends IPSModule
         $bgColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLBackgroundColor'));
         $fontColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLFontColor'));
         $varList = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
-        $master = $this->GetMasterMetadata();
 
         $itemsHtml = "";
         foreach ($varList as $item) {
-            // Fix: Guard clause to prevent "Undefined array key Ident" warnings
-            if (!isset($item['Ident']) || !($item['Show'] ?? false)) continue;
+            if (!($item['Show'] ?? false)) continue;
 
             $varID = @$this->GetIDForIdent($item['Ident']);
             $formatted = ($varID && IPS_VariableExists($varID)) ? GetValueFormatted($varID) : '--';
-            $label = (!empty($item['Label'])) ? $item['Label'] : ($master[$item['Ident']] ?? $item['Ident']);
+            $label = $item['Label'] ?? $item['Ident'] ?? 'Unknown';
 
+            // CSS Fix: grid-area used for strict placement; clamp used for robust scaling
             $itemsHtml .= "
-            <div style='grid-row: {$item['Row']}; grid-column: {$item['Col']}; border: 1px solid rgba(255,255,255,0.1); padding: 1cqi; text-align: center; display: flex; flex-direction: column; justify-content: center; border-radius: 4px;'>
-                <div style='font-size: 3cqi; opacity: 0.8; margin-bottom: 0.2cqi;'>$label</div>
-                <div style='font-size: 5cqi; font-weight: bold;'>$formatted</div>
+            <div style='grid-area: {$item['Row']} / {$item['Col']}; border: 1px solid rgba(255,255,255,0.15); padding: 1.5cqi; text-align: center; display: flex; flex-direction: column; justify-content: center; border-radius: 4px; overflow: hidden;'>
+                <div style='font-size: clamp(8px, 3.5cqi, 24px); opacity: 0.8; margin-bottom: 0.3cqi; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;'>$label</div>
+                <div style='font-size: clamp(10px, 6cqi, 48px); font-weight: bold; white-space: nowrap;'>$formatted</div>
             </div>";
         }
 
         $html = "
-        <div style='container-type: inline-size; background-color: $bgColor; color: $fontColor; font-family: Segoe UI, sans-serif; height: 100%; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 2cqi; border-radius: 8px;'>
-            <div style='text-align: center; font-size: 6cqi; font-weight: bold; padding-bottom: 2cqi; border-bottom: 1px solid rgba(255,255,255,0.2);'>$stationName</div>
-            <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1.5cqi; flex-grow: 1; margin-top: 2cqi;'>$itemsHtml</div>
+        <div style='container-type: inline-size; background-color: $bgColor; color: $fontColor; font-family: \"Segoe UI\", Roboto, sans-serif; height: 100%; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 2cqi; border-radius: 8px;'>
+            <div style='text-align: center; font-size: clamp(12px, 8cqi, 56px); font-weight: bold; padding-bottom: 2cqi; border-bottom: 1px solid rgba(255,255,255,0.2);'>$stationName</div>
+            <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1.5cqi; flex-grow: 1; margin-top: 2cqi;'>
+                $itemsHtml
+            </div>
         </div>";
 
         $this->SetValue('Dashboard', $html);
