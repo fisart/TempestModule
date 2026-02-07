@@ -70,7 +70,8 @@ class TempestWeatherStation extends IPSModule
         $changed = false;
 
         foreach ($list as &$item) {
-            if (empty($item['Label']) && isset($master[$item['Ident']])) {
+            // Fix: Added isset($item['Ident']) check to prevent line 73 warning
+            if (isset($item['Ident']) && empty($item['Label']) && isset($master[$item['Ident']])) {
                 $item['Label'] = $master[$item['Ident']];
                 $changed = true;
             }
@@ -238,7 +239,8 @@ class TempestWeatherStation extends IPSModule
 
         $itemsHtml = "";
         foreach ($varList as $item) {
-            if (!($item['Show'] ?? false)) continue;
+            // Fix: Guard clause to prevent "Undefined array key Ident" warnings
+            if (!isset($item['Ident']) || !($item['Show'] ?? false)) continue;
 
             $varID = @$this->GetIDForIdent($item['Ident']);
             $formatted = ($varID && IPS_VariableExists($varID)) ? GetValueFormatted($varID) : '--';
