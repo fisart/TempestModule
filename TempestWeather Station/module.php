@@ -178,7 +178,7 @@ class TempestWeatherStation extends IPSModule
         $regression->train($x, $y);
         $slope = $regression->getSlope();
 
-        $statusID = $this->MaintainVariable('Battery_Status', 'Battery Status', 0, $prefix . 'battery_status', 23, true);
+        $statusID = $this->MaintainVariable('Battery_Status', 'Battery Status', 1, $prefix . 'battery_status', 23, true);
         $slopeID = $this->MaintainVariable('Slope', 'Regression Slope', 2, $prefix . 'slope', 22, true);
 
         $oldSlope = GetValue($slopeID);
@@ -252,9 +252,6 @@ class TempestWeatherStation extends IPSModule
 
             $varID = @$this->GetIDForIdent($item['Ident']);
             if ($varID) {
-                $val = GetValue($varID);
-                $profile = IPS_GetVariable($varID)['VariableCustomProfile'] ?: IPS_GetVariable($varID)['VariableProfile'];
-                // Fix: Correct function name is IPS_GetVariableProfileText
                 $formatted = GetValueFormatted($varID);
             } else {
                 $formatted = '--';
@@ -507,7 +504,8 @@ class TempestWeatherStation extends IPSModule
             // Mask sensor status (Ported from line 412)
             if ($name == 'sensor_status') $val = $val & bindec('111111111');
 
-            $this->MaintainVariable($ident, $name, 1, $prefix . $this->GetProfileForName($name), $index + 50, true);
+            $profileIdent = $this->GetProfileForName($name);
+            $this->MaintainVariable($ident, $name, $config['profiles'][$profileIdent]['type'], $prefix . $profileIdent, $index + 50, true);
             $this->HandleValueUpdate($ident, $val, $timestamp, $check);
         }
     }
@@ -531,12 +529,15 @@ class TempestWeatherStation extends IPSModule
                     if (!isset($config['descriptions']['radio_stats'][$subIndex])) continue;
                     $subName = $config['descriptions']['radio_stats'][$subIndex];
                     $subIdent = 'hub_radio_' . str_replace(' ', '_', $subName);
-                    $this->MaintainVariable($subIdent, $subName, 1, $prefix . $this->GetProfileForName($subName), $subIndex + 100, true);
+                    $subProfileIdent = $this->GetProfileForName($subName);
+                    $this->MaintainVariable($subIdent, $subName, $config['profiles'][$subProfileIdent]['type'], $prefix . $subProfileIdent, $subIndex + 100, true);
                     $this->HandleValueUpdate($subIdent, $subVal, $timestamp, $check);
                 }
             } else {
                 $ident = 'hub_' . str_replace(' ', '_', $name);
-                $this->MaintainVariable($ident, $name, 1, $prefix . $this->GetProfileForName($name), $index + 80, true);
+                // Fix: Added dynamic type lookup here as well
+                $profileIdent = $this->GetProfileForName($name);
+                $this->MaintainVariable($ident, $name, $config['profiles'][$profileIdent]['type'], $prefix . $profileIdent, $index + 80, true);
                 $this->HandleValueUpdate($ident, $val, $timestamp, $check);
             }
         }
