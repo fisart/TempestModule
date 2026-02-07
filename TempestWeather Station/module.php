@@ -233,18 +233,18 @@ class TempestWeatherStation extends IPSModule
             $formatted = ($varID && IPS_VariableExists($varID)) ? GetValueFormatted($varID) : '--';
             $label = $item['Label'] ?? $item['Ident'] ?? 'Unknown';
 
-            // CSS Fix: grid-area used for strict placement; clamp used for robust scaling
+            // Fix: Lowered multipliers (2.2cqi / 4.5cqi) and added flex alignment for better spacing
             $itemsHtml .= "
-            <div style='grid-area: {$item['Row']} / {$item['Col']}; border: 1px solid rgba(255,255,255,0.15); padding: 1.5cqi; text-align: center; display: flex; flex-direction: column; justify-content: center; border-radius: 4px; overflow: hidden;'>
-                <div style='font-size: clamp(8px, 3.5cqi, 24px); opacity: 0.8; margin-bottom: 0.3cqi; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;'>$label</div>
-                <div style='font-size: clamp(10px, 6cqi, 48px); font-weight: bold; white-space: nowrap;'>$formatted</div>
+            <div style='grid-area: {$item['Row']} / {$item['Col']}; border: 1px solid rgba(255,255,255,0.1); padding: 1cqi; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 4px; overflow: hidden;'>
+                <div style='font-size: clamp(8px, 2.2cqi, 18px); opacity: 0.7; white-space: nowrap; text-overflow: ellipsis; width: 100%; overflow: hidden;'>$label</div>
+                <div style='font-size: clamp(10px, 4.5cqi, 36px); font-weight: bold; white-space: nowrap;'>$formatted</div>
             </div>";
         }
 
         $html = "
-        <div style='container-type: inline-size; background-color: $bgColor; color: $fontColor; font-family: \"Segoe UI\", Roboto, sans-serif; height: 100%; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 2cqi; border-radius: 8px;'>
-            <div style='text-align: center; font-size: clamp(12px, 8cqi, 56px); font-weight: bold; padding-bottom: 2cqi; border-bottom: 1px solid rgba(255,255,255,0.2);'>$stationName</div>
-            <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1.5cqi; flex-grow: 1; margin-top: 2cqi;'>
+        <div style='container-type: inline-size; background-color: $bgColor; color: $fontColor; font-family: \"Segoe UI\", sans-serif; height: 100%; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 1.5cqi; border-radius: 8px;'>
+            <div style='text-align: center; font-size: clamp(12px, 5cqi, 48px); font-weight: bold; padding-bottom: 1.5cqi; border-bottom: 1px solid rgba(255,255,255,0.2);'>$stationName</div>
+            <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1cqi; flex-grow: 1; margin-top: 1.5cqi;'>
                 $itemsHtml
             </div>
         </div>";
@@ -537,46 +537,52 @@ class TempestWeatherStation extends IPSModule
         $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
         $master = $this->GetMasterMetadata();
 
-        // Blueprint 2.0: Read from RAM-Cache (Attribute) first to preserve active session edits
         $bufferData = $this->ReadAttributeString('HTMLVariableListBuffer');
         $values = json_decode($bufferData, true) ?: [];
 
-        // If RAM-Cache is empty (e.g. first time opening), load from permanent Property
         if (empty($values)) {
             $values = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
         }
 
         $existingIdents = array_column($values, 'Ident');
 
-        // Refresh labels and inject newly discovered variables into the session values
         foreach ($values as &$val) {
             if (isset($val['Ident']) && isset($master[$val['Ident']])) {
                 $val['Label'] = $master[$val['Ident']];
             }
         }
+
+        // Fix: Auto-distribute new variables to prevent stacking on Row 1, Col 1
+        $r = 1;
+        $c = 1;
         foreach ($master as $ident => $label) {
             if (!in_array($ident, $existingIdents)) {
-                $values[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
+                $values[] = ['Label' => $label, 'Show' => false, 'Row' => $r, 'Col' => $c, 'Ident' => $ident];
+                $c++;
+                if ($c > 4) {
+                    $c = 1;
+                    $r++;
+                }
             }
         }
 
-        // Update the RAM-Cache with the current merged state
         $this->WriteAttributeString('HTMLVariableListBuffer', json_encode($values));
 
-        // Move the list to Actions for stateless management
         foreach ($form['elements'] as $k => $panel) {
             if (isset($panel['caption']) && $panel['caption'] == 'Dashboard Customization') {
-                foreach ($panel['items'] as $i => $item) {
-                    if (isset($item['name']) && $item['name'] == 'HTMLVariableList') {
-                        $listComponent = $item;
-                        $listComponent['values'] = $values;
-                        $listComponent['onEdit'] = "TMT_UpdateDashboardRow(\$id, json_encode(\$HTMLVariableList));";
+                if (isset($panel['items']) && is_array($panel['items'])) {
+                    foreach ($panel['items'] as $i => $item) {
+                        if (isset($item['name']) && $item['name'] == 'HTMLVariableList') {
+                            $listComponent = $item;
+                            $listComponent['values'] = $values;
+                            $listComponent['onEdit'] = "TMT_UpdateDashboardRow(\$id, json_encode(\$HTMLVariableList));";
 
-                        $form['actions'][] = $listComponent;
-                        unset($form['elements'][$k]['items'][$i]);
+                            $form['actions'][] = $listComponent;
+                            unset($form['elements'][$k]['items'][$i]);
+                        }
                     }
+                    $form['elements'][$k]['items'] = array_values($form['elements'][$k]['items']);
                 }
-                $form['elements'][$k]['items'] = array_values($form['elements'][$k]['items'] ?? []);
             }
         }
 
