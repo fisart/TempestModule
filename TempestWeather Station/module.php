@@ -232,6 +232,10 @@ class TempestWeatherStation extends IPSModule
         $varList = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
         $interval = $this->ReadPropertyInteger('HTMLUpdateInterval');
 
+        // Fix: Retrieve and format the observation time (Time Epoch) for the header
+        $timeID = @$this->GetIDForIdent('Time_Epoch');
+        $timeStr = ($timeID && IPS_VariableExists($timeID)) ? date('H:i:s', GetValue($timeID)) : '--:--:--';
+
         $itemsHtml = "";
         foreach ($varList as $item) {
             if (!($item['Show'] ?? false)) continue;
@@ -247,19 +251,20 @@ class TempestWeatherStation extends IPSModule
             </div>";
         }
 
-        // Fix: Synchronized client-side reload based on the next expected server timer update
         $reloadScript = "";
         if ($interval > 0) {
             $lastUpdate = IPS_GetVariable($this->GetIDForIdent('Dashboard'))['VariableUpdated'];
             $nextUpdate = $lastUpdate + $interval;
-            $secondsToWait = max(1, ($nextUpdate - time()) + 2); // 2 second safety buffer
+            $secondsToWait = max(1, ($nextUpdate - time()) + 2);
             $reloadScript = "<script>setTimeout(function(){ location.reload(); }, " . ($secondsToWait * 1000) . ");</script>";
         }
 
         $html = "
         <div style='container-type: inline-size; background-color: $bgColor; color: $fontColor; font-family: \"Segoe UI\", sans-serif; height: 100%; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 1.5cqi; border-radius: 8px;'>
-            <div style='text-align: center; font-size: clamp(12px, 5cqi, 48px); font-weight: bold; padding-bottom: 1.5cqi; border-bottom: 1px solid rgba(255,255,255,0.2);'>$stationName</div>
-            <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1.5cqi; flex-grow: 1; margin-top: 2cqi;'>
+            <div style='text-align: center; font-size: clamp(12px, 5cqi, 48px); font-weight: bold; padding-bottom: 1.5cqi; border-bottom: 1px solid rgba(255,255,255,0.2);'>
+                $stationName <span style='font-size: 0.6em; opacity: 0.6; margin-left: 2cqi;'>($timeStr)</span>
+            </div>
+            <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1cqi; flex-grow: 1; margin-top: 2cqi;'>
                 $itemsHtml
             </div>
             $reloadScript
