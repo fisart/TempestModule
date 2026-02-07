@@ -65,12 +65,12 @@ class TempestWeatherStation extends IPSModule
         $this->UpdateProfiles();
 
         $config = $this->GetModuleConfig();
-        $listString = $this->ReadPropertyString('HTMLVariableList');
-        $currentList = json_decode($listString, true) ?: [];
-        $newList = [];
-        $hasChanged = false;
+        $currentList = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
+        $existingIdents = array_column($currentList, 'Ident');
+        $newList = $currentList;
+        $hasNew = false;
 
-        // 1. Generate the master map of all potential variables
+        // 1. Generate the master map of all potential variables from metadata
         $masterMetadata = [];
         foreach ($config['descriptions']['obs_st'] as $name) {
             if ($name == 'Rohdaten') continue;
@@ -87,29 +87,16 @@ class TempestWeatherStation extends IPSModule
             $masterMetadata['hub_radio_' . str_replace(' ', '_', $name)] = 'Radio: ' . $name;
         }
 
-        // 2. Repair existing entries and remove duplicates/orphans
-        $existingIdents = [];
-        foreach ($currentList as $item) {
-            $ident = $item['Ident'] ?? '';
-            if ($ident && isset($masterMetadata[$ident])) {
-                $item['Label'] = $masterMetadata[$ident]; // Force restore correct label
-                $newList[] = $item;
-                $existingIdents[] = $ident;
-            } else {
-                $hasChanged = true; // Orphaned or broken item
-            }
-        }
-
-        // 3. Add missing variables to the list
+        // 2. Only add variables that are completely missing from the property
         foreach ($masterMetadata as $ident => $label) {
             if (!in_array($ident, $existingIdents)) {
                 $newList[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
-                $hasChanged = true;
+                $hasNew = true;
             }
         }
 
-        // 4. Save and restart if configuration was repaired
-        if ($hasChanged || empty($currentList)) {
+        // 3. Only save and restart if the list was expanded or empty
+        if ($hasNew || empty($currentList)) {
             IPS_SetProperty($this->InstanceID, 'HTMLVariableList', json_encode($newList));
             IPS_ApplyChanges($this->InstanceID);
             return;
@@ -437,8 +424,8 @@ class TempestWeatherStation extends IPSModule
         return [
             'descriptions' => [
                 'obs_st' => [0 => 'Time Epoch', 1 => 'Wind Lull', 2 => 'Wind Avg', 3 => 'Wind Gust', 4 => 'Wind Direction', 5 => 'Wind Sample Interval', 6 => 'Station Pressure', 7 => 'Air Temperature', 8 => 'Relative Humidity', 9 => 'Illuminance', 10 => 'UV', 11 => 'Solar Radiation', 12 => 'Precip Accumulated', 13 => 'Precipitation Type', 14 => 'Lightning Strike Avg Distance', 15 => 'Lightning Strike Count', 16 => 'Battery', 17 => 'Report Interval', 18 => 'Slope', 20 => 'Battery Status', 21 => 'System Condition', 22 => 'Counter Slope Datasets', 23 => 'Average', 24 => 'Median', 25 => 'time_delta', 26 => 'stamp_delta'],
-                'device_status' => [0 => 'serial_number', 1 => 'type', 2 => 'hub_sn', 3 => 'timestamp', 4 => 'uptime', 5 => 'voltage', 6 => 'firmware_revision', 7 => 'rssi', 8 => 'hub_rssi', 9 => 'sensor_status', 10 => 'debug'],
-                'hub_status' => [0 => 'serial_number', 1 => 'type', 2 => 'firmware_revision', 3 => 'uptime', 4 => 'rssi', 5 => 'timestamp', 6 => 'reset_flags', 7 => 'seq', 9 => 'radio_stats'],
+                'device_status' => [0 => 'serial_number', 1 => 'type', 2 => 'hub_sn', 3 => 'timestamp', 4 => 'uptime', 5 => 'voltage', 6 => 'firmware_revision', 7 => 'rssi', 8 => 'hub_rssi', 9 => 'sensor_status', 10 => 'debug', 12 => 'time_delta'],
+                'hub_status' => [0 => 'serial_number', 1 => 'type', 2 => 'firmware_revision', 3 => 'uptime', 4 => 'rssi', 5 => 'timestamp', 6 => 'reset_flags', 7 => 'seq', 9 => 'radio_stats', 17 => 'time_delta'],
                 'radio_stats' => [0 => 'Version', 1 => 'Reboot Count', 2 => 'I2C Bus Error Count', 3 => 'Radio Status', 4 => 'Radio Network ID']
             ],
             'profiles' => [
