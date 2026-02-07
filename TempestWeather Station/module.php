@@ -65,38 +65,57 @@ class TempestWeatherStation extends IPSModule
         $this->UpdateProfiles();
 
         $config = $this->GetModuleConfig();
-        $currentList = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
-        $existingIdents = array_column($currentList, 'Ident');
-        $newList = $currentList;
-        $hasNew = false;
+        $listString = $this->ReadPropertyString('HTMLVariableList');
+        $currentList = json_decode($listString, true) ?: [];
+        $newList = [];
+        $hasChanged = false;
 
-        // 1. Generate the master map of all potential variables from metadata
+        // 1. Generate the master map of all current potential variables from metadata
         $masterMetadata = [];
         foreach ($config['descriptions']['obs_st'] as $name) {
             if ($name == 'Rohdaten') continue;
             $masterMetadata[str_replace([' ', '(', ')'], ['_', '', ''], $name)] = $name;
         }
         foreach ($config['descriptions']['device_status'] as $name) {
+            if ($name == 'Rohdaten') continue;
             $masterMetadata['dev_' . str_replace(' ', '_', $name)] = 'Device: ' . $name;
         }
         foreach ($config['descriptions']['hub_status'] as $name) {
-            if ($name == 'radio_stats') continue;
+            if ($name == 'radio_stats' || $name == 'Rohdaten') continue;
             $masterMetadata['hub_' . str_replace(' ', '_', $name)] = 'Hub: ' . $name;
         }
         foreach ($config['descriptions']['radio_stats'] as $name) {
             $masterMetadata['hub_radio_' . str_replace(' ', '_', $name)] = 'Radio: ' . $name;
         }
 
-        // 2. Only add variables that are completely missing from the property
-        foreach ($masterMetadata as $ident => $label) {
-            if (!in_array($ident, $existingIdents)) {
-                $newList[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
-                $hasNew = true;
+        // 2. Sync existing list with metadata to fix blank labels or remove orphans
+        $existingIdents = [];
+        foreach ($currentList as $item) {
+            $ident = $item['Ident'] ?? '';
+            // If the variable is still valid in current metadata, keep it and refresh the label
+            if ($ident && isset($masterMetadata[$ident])) {
+                if (($item['Label'] ?? '') !== $masterMetadata[$ident]) {
+                    $item['Label'] = $masterMetadata[$ident];
+                    $hasChanged = true;
+                }
+                $newList[] = $item;
+                $existingIdents[] = $ident;
+            } else {
+                // If it's not in metadata (like Rohdaten), it's an orphan; mark changed to remove it
+                $hasChanged = true;
             }
         }
 
-        // 3. Only save and restart if the list was expanded or empty
-        if ($hasNew || empty($currentList)) {
+        // 3. Add any new variables found in metadata that aren't in the list yet
+        foreach ($masterMetadata as $ident => $label) {
+            if (!in_array($ident, $existingIdents)) {
+                $newList[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
+                $hasChanged = true;
+            }
+        }
+
+        // 4. Only save and restart if the list was modified, expanded, or empty
+        if ($hasChanged || empty($currentList)) {
             IPS_SetProperty($this->InstanceID, 'HTMLVariableList', json_encode($newList));
             IPS_ApplyChanges($this->InstanceID);
             return;
