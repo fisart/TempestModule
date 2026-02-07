@@ -163,16 +163,13 @@ class TempestWeatherStation extends IPSModule
         $batteryID = @$this->GetIDForIdent('Battery');
         if (!$batteryID) return;
 
-        // Ensure logging is enabled for the Battery variable (Required for Regression)
         if (!AC_GetLoggingStatus($archiveID, $batteryID)) {
             AC_SetLoggingStatus($archiveID, $batteryID, true);
             IPS_ApplyChanges($archiveID);
-            return; // Exit and wait for next update so data can be logged
+            return;
         }
 
         $history = @AC_GetLoggedValues($archiveID, $batteryID, time() - 86400, time(), $nrPoints);
-
-        // Fix: Check if history is an array to prevent Fatal Error on count()
         if (!is_array($history) || count($history) < 5) return;
 
         $x = [];
@@ -187,18 +184,22 @@ class TempestWeatherStation extends IPSModule
         $slope = $regression->getSlope();
 
         $config = $this->GetModuleConfig();
-        $statusID = $this->MaintainVariableSafe('Battery_Status', 'Battery Status', $config['profiles']['battery_status']['type'], $prefix . 'battery_status', 23, true);
-        $slopeID = $this->MaintainVariableSafe('Slope', 'Regression Slope', $config['profiles']['slope']['type'], $prefix . 'slope', 22, true);
 
-        if (!$statusID || !$slopeID) return;
+        // Maintain the variables
+        $this->MaintainVariableSafe('Battery_Status', 'Battery Status', $config['profiles']['battery_status']['type'], $prefix . 'battery_status', 23, true);
+        $this->MaintainVariableSafe('Slope', 'Regression Slope', $config['profiles']['slope']['type'], $prefix . 'slope', 22, true);
+        $this->MaintainVariableSafe('Average', 'Average Voltage', $config['profiles']['volt']['type'], $prefix . 'volt', 20, true);
+
+        // Fix: Retrieve actual IDs instead of using the boolean return value of MaintainVariable
+        $statusID = $this->GetIDForIdent('Battery_Status');
+        $slopeID = $this->GetIDForIdent('Slope');
+        $avgID = $this->GetIDForIdent('Average');
 
         $oldSlope = GetValue($slopeID);
         $isCharging = (bool)GetValue($statusID);
         $newState = $isCharging ? ($slope >= $triggerSlope && $slope >= $oldSlope) : ($slope >= $triggerSlope && $slope > $oldSlope);
 
-        $avgID = $this->MaintainVariableSafe('Average', 'Average Voltage', $config['profiles']['volt']['type'], $prefix . 'volt', 20, true);
-        if ($avgID) SetValue($avgID, $this->calculate_average($y));
-
+        SetValue($avgID, $this->calculate_average($y));
         SetValue($slopeID, $slope);
         SetValue($statusID, (int)$newState);
     }
