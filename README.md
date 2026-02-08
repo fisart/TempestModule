@@ -73,3 +73,6 @@ Das Modul fungiert als lokaler Empfänger für die Weatherflow Tempest Wettersta
 - **Old Version:** 3.6.3
 - **New Version:** 3.7.0
 - **Commit Message:** `docs: add detailed functionality and data flow description in English and German`
+
+- <img width="1005" height="749" alt="image" src="https://github.com/user-attachments/assets/15db2c8c-3b10-48be-b8d4-193369449cf5" />
+
