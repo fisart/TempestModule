@@ -20,6 +20,7 @@ class TempestWeatherStation extends IPSModule
         // General Settings
         $this->RegisterPropertyString('StationName', 'Tempest Station Status');
         $this->RegisterPropertyString('ProfilePrefix', 'Tempest_');
+        $this->RegisterPropertyInteger('SecretsInstanceID', 0);
 
         // Battery Regression
         $this->RegisterPropertyBoolean('ExperimentalRegression', true);
@@ -118,10 +119,74 @@ class TempestWeatherStation extends IPSModule
      */
     public function ProcessHookData()
     {
-        header('Content-Type: text/plain; charset=utf-8');
-        echo "Tempest Webhook is active. Instance ID: " . $this->InstanceID;
-    }
+        // 1. Web App Manifest Handler
+        if (isset($_GET['manifest'])) {
+            header('Content-Type: application/json');
+            $bgColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLBackgroundColor'));
+            echo json_encode([
+                "name" => $this->ReadPropertyString('StationName'),
+                "short_name" => "Tempest",
+                "start_url" => ".",
+                "display" => "standalone",
+                "background_color" => $bgColor,
+                "theme_color" => $bgColor,
+                "icons" => [
+                    [
+                        "src" => "https://weatherflow.github.io/Tempest/img/tempest-icon-192.png",
+                        "sizes" => "192x192",
+                        "type" => "image/png"
+                    ]
+                ]
+            ]);
+            return;
+        }
 
+        // 2. Basic Auth Validation via Secrets Manager
+        $secretsID = $this->ReadPropertyInteger('SecretsInstanceID');
+        if ($secretsID > 0 && IPS_InstanceExists($secretsID)) {
+            if (!isset($_SERVER['PHP_AUTH_USER'])) $_SERVER['PHP_AUTH_USER'] = "";
+            if (!isset($_SERVER['PHP_AUTH_PW'])) $_SERVER['PHP_AUTH_PW'] = "";
+
+            $access_data = json_decode(SEC_GetSecret($secretsID, 'Webhooks'), true);
+            $validUser = $access_data['Tempest']['User'] ?? '';
+            $validPass = $access_data['Tempest']['PW'] ?? '';
+
+            if (($_SERVER['PHP_AUTH_USER'] !== $validUser) || ($_SERVER['PHP_AUTH_PW'] !== $validPass)) {
+                header('WWW-Authenticate: Basic Realm="Tempest Dashboard"');
+                header('HTTP/1.0 401 Unauthorized');
+                echo "Authorization required";
+                return;
+            }
+        }
+
+        // 3. Render Dashboard with Standalone App wrapper
+        $dashboardHTML = $this->GetValue('Dashboard');
+        $bgColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLBackgroundColor'));
+        $title = $this->ReadPropertyString('StationName');
+
+        echo "<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
+    <title>$title</title>
+    <link rel='manifest' href='?manifest=1'>
+    <meta name='apple-mobile-web-app-capable' content='yes'>
+    <meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'>
+    <meta name='mobile-web-app-capable' content='yes'>
+    <meta name='apple-mobile-web-app-title' content='Tempest'>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background-color: $bgColor; }
+        #container { width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+    <div id='container'>
+        $dashboardHTML
+    </div>
+</body>
+</html>";
+    }
 
     public function ReceiveData($JSONString)
     {

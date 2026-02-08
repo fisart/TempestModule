@@ -2,7 +2,8 @@
     "elements": [
         { "type": "ExpansionPanel", "caption": "General Settings", "items": [
             { "type": "ValidationTextBox", "name": "StationName", "caption": "Station Name" },
-            { "type": "ValidationTextBox", "name": "ProfilePrefix", "caption": "Profile Prefix" }
+            { "type": "ValidationTextBox", "name": "ProfilePrefix", "caption": "Profile Prefix" },
+            { "type": "NumberSpinner", "name": "SecretsInstanceID", "caption": "Secrets Manager Instance ID" }
         ]},
         { "type": "ExpansionPanel", "caption": "Battery Regression (Experimental)", "items": [
             { "type": "CheckBox", "name": "ExperimentalRegression", "caption": "Enable Battery Hysteresis Logic" },
