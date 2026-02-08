@@ -83,24 +83,37 @@ class TempestWeatherStation extends IPSModule
 
     private function RegisterHook($WebHook)
     {
+        $this->SendDebug('RegisterHook', 'Path: ' . $WebHook, 0);
         $ids = IPS_GetInstanceListByModuleID('{015A6AFE-E061-4916-87A2-0D7290779C82}');
         if (count($ids) > 0) {
-            $hooks = json_decode(IPS_GetProperty($ids[0], 'Hooks'), true);
+            $controlID = $ids[0];
+            $hooksData = IPS_GetProperty($controlID, 'Hooks');
+            $hooks = json_decode($hooksData, true);
+            if (!is_array($hooks)) $hooks = [];
+
             $found = false;
             foreach ($hooks as $index => $hook) {
                 if ($hook['Hook'] == $WebHook) {
                     if ($hook['TargetID'] == $this->InstanceID) {
-                        return; // Already registered correctly
+                        $this->SendDebug('RegisterHook', 'Already exists correctly.', 0);
+                        return;
                     }
                     $hooks[$index]['TargetID'] = $this->InstanceID;
                     $found = true;
+                    $this->SendDebug('RegisterHook', 'Found path, updated TargetID.', 0);
                 }
             }
+
             if (!$found) {
                 $hooks[] = ['Hook' => $WebHook, 'TargetID' => $this->InstanceID];
+                $this->SendDebug('RegisterHook', 'Path not found, adding new entry.', 0);
             }
-            IPS_SetProperty($ids[0], 'Hooks', json_encode($hooks));
-            IPS_ApplyChanges($ids[0]);
+
+            IPS_SetProperty($controlID, 'Hooks', json_encode($hooks));
+            IPS_ApplyChanges($controlID);
+            $this->SendDebug('RegisterHook', 'Applied changes to WebHook Control.', 0);
+        } else {
+            $this->SendDebug('RegisterHook', 'Error: WebHook Control not found.', 0);
         }
     }
 
