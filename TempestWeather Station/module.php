@@ -7,6 +7,7 @@ require_once __DIR__ . '/../libs/RegressionHelper.php';
 /**
  * TempestWeatherStation Class
  * Handles data from Weatherflow Tempest via UDP.
+ * Version 2.12.1
  */
 class TempestWeatherStation extends IPSModule
 {
@@ -203,23 +204,34 @@ class TempestWeatherStation extends IPSModule
 
         $config = $this->GetModuleConfig();
 
-        // Maintain the variables
+        // Maintain variables including System Condition and Counter
         $this->MaintainVariableSafe('Battery_Status', 'Battery Status', $config['profiles']['battery_status']['type'], $prefix . 'battery_status', 23, true);
         $this->MaintainVariableSafe('Slope', 'Regression Slope', $config['profiles']['slope']['type'], $prefix . 'slope', 22, true);
         $this->MaintainVariableSafe('Average', 'Average Voltage', $config['profiles']['volt']['type'], $prefix . 'volt', 20, true);
+        $this->MaintainVariableSafe('Counter_Slope_Datasets', 'Counter Slope Datasets', 1, $prefix . 'seconds', 21, true);
+        $this->MaintainVariableSafe('System_Condition', 'System Condition', $config['profiles']['system_condition']['type'], $prefix . 'system_condition', 24, true);
 
-        // Fix: Retrieve actual IDs instead of using the boolean return value of MaintainVariable
         $statusID = $this->GetIDForIdent('Battery_Status');
         $slopeID = $this->GetIDForIdent('Slope');
         $avgID = $this->GetIDForIdent('Average');
+        $sysCondID = $this->GetIDForIdent('System_Condition');
 
         $oldSlope = GetValue($slopeID);
         $isCharging = (bool)GetValue($statusID);
         $newState = $isCharging ? ($slope >= $triggerSlope && $slope >= $oldSlope) : ($slope >= $triggerSlope && $slope > $oldSlope);
 
+        // Fix: Dynamic Profile Association Swap for System Condition
+        $pName = $prefix . 'system_condition';
+        $associations = $newState ? $config['charge'] : $config['discharge'];
+        foreach ($associations['Text'] as $val => $text) {
+            IPS_SetVariableProfileAssociation($pName, (float)$val, $text, '', $associations['Color'][$val] ?? -1);
+        }
+
         SetValue($avgID, $this->calculate_average($y));
+        SetValue($this->GetIDForIdent('Counter_Slope_Datasets'), count($x));
         SetValue($slopeID, $slope);
         SetValue($statusID, (int)$newState);
+        SetValue($sysCondID, $currentVoltage);
     }
 
     private function GenerateHTMLDashboard()
@@ -443,8 +455,30 @@ class TempestWeatherStation extends IPSModule
                 'system_condition' => ['type' => 2, 'digits' => 3, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 3, 'step' => 0.001, 'associations' => null],
                 'text' => ['type' => 3, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 0, 'step' => 0]
             ],
-            'charge' => ['Text' => [0 => '+ Hibernate', 4 => '+ Wind 1m', 6 => '+ Wind 6s', 8 => '+ Full Perf'], 'Color' => [0 => $purple, 4 => $orange, 6 => $yellow, 8 => $green]],
-            'discharge' => ['Text' => [0 => '- Hibernate', 4 => '- Wind 1m', 6 => '- Wind 6s', 8 => '- Full Perf'], 'Color' => [0 => $purple, 4 => $orange, 6 => $yellow, 8 => $green]]
+            'charge' => [
+                'Text' => [
+                    2.33 => '+ Hybernate',
+                    2.355 => '+ Wind 5 Min NO Lightning+Rain',
+                    2.375 => '+ Wind sampling interval set to one minute',
+                    2.39 => '+ Wind sampling interval set to one minute',
+                    2.41 => '+ Wind every 6 sec.',
+                    2.415 => '+ Wind every 6 sec.',
+                    2.455 => '+ All sensors enabled and operating at full performance'
+                ],
+                'Color' => [2.33 => $purple, 2.355 => $red, 2.375 => $orange, 2.39 => $orange, 2.41 => $yellow, 2.415 => $yellow, 2.455 => $green]
+            ],
+            'discharge' => [
+                'Text' => [
+                    2.33 => '- Hybernate',
+                    2.355 => '- Wind 5 Min NO Lightning+Rain',
+                    2.375 => '- Wind sampling interval set to one minute',
+                    2.39 => '- Wind sampling interval set to one minute',
+                    2.41 => '- Wind every 6 sec.',
+                    2.415 => '- Wind every 6 sec.',
+                    2.455 => '- All sensors enabled and operating at full performance'
+                ],
+                'Color' => [2.33 => $purple, 2.355 => $red, 2.375 => $orange, 2.39 => $orange, 2.41 => $yellow, 2.415 => $yellow, 2.455 => $green]
+            ]
         ];
     }
 
