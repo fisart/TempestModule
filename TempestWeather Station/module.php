@@ -353,35 +353,61 @@ class TempestWeatherStation extends IPSModule
         $timeID = @$this->GetIDForIdent('Time_Epoch');
         $timeStr = ($timeID && IPS_VariableExists($timeID)) ? date('H:i:s', GetValue($timeID)) : '--:--:--';
 
-        // Fix: Retrieve the formatted System Condition (Charge/Discharge Status)
         $sysCondID = @$this->GetIDForIdent('System_Condition');
         $sysCondStr = ($sysCondID && IPS_VariableExists($sysCondID)) ? GetValueFormatted($sysCondID) : '';
 
+        $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
+
         $itemsHtml = "";
+        $chartScripts = "";
+
         foreach ($varList as $item) {
             if (!($item['Show'] ?? false)) continue;
 
             $varID = @$this->GetIDForIdent($item['Ident']);
-            $formatted = ($varID && IPS_VariableExists($varID)) ? GetValueFormatted($varID) : '--';
+            if (!$varID || !IPS_VariableExists($varID)) continue;
+
+            $formatted = GetValueFormatted($varID);
             $label = $item['Label'] ?? $item['Ident'] ?? 'Unknown';
+            $chartHtml = "";
+
+            if (($item['ShowChart'] ?? false) && AC_GetLoggingStatus($archiveID, $varID)) {
+                $history = AC_GetLoggedValues($archiveID, $varID, time() - 86400, time(), 0);
+                if (count($history) > 1) {
+                    $points = [];
+                    foreach (array_reverse($history) as $row) {
+                        $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($row['Value'], 2) . "]";
+                    }
+                    $dataString = implode(',', $points);
+                    $chartID = "chart_" . $item['Ident'];
+                    $chartHtml = "<div id='$chartID' style='width: 100%; height: 30px; margin-top: 5px;'></div>";
+
+                    $chartScripts .= "
+                    Highcharts.chart('$chartID', {
+                        chart: { type: 'area', margin: [0, 0, 0, 0], backgroundColor: null, height: 30, skipClone: true },
+                        title: { text: null }, credits: { enabled: false }, legend: { enabled: false },
+                        xAxis: { visible: false }, yAxis: { visible: false },
+                        tooltip: { enabled: false },
+                        plotOptions: { series: { marker: { enabled: false }, lineWidth: 1, fillOpacity: 0.1, color: '$fontColor', animation: false } },
+                        series: [{ data: [$dataString] }]
+                    });";
+                }
+            }
 
             $itemsHtml .= "
             <div style='grid-area: {$item['Row']} / {$item['Col']}; border: 1px solid rgba(255,255,255,0.1); padding: 1cqi; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 4px; overflow: hidden;'>
                 <div style='font-size: clamp(8px, 2.2cqi, 18px); opacity: 0.7; white-space: nowrap; text-overflow: ellipsis; width: 100%; overflow: hidden;'>$label</div>
                 <div style='font-size: clamp(10px, 4.5cqi, 36px); font-weight: bold; white-space: nowrap;'>$formatted</div>
+                $chartHtml
             </div>";
         }
 
-        $reloadScript = "";
-        if ($interval > 0) {
-            $lastUpdate = IPS_GetVariable($this->GetIDForIdent('Dashboard'))['VariableUpdated'];
-            $nextUpdate = $lastUpdate + $interval;
-            $secondsToWait = max(1, ($nextUpdate - time()) + 2);
-            $reloadScript = "<script>setTimeout(function(){ location.reload(); }, " . ($secondsToWait * 1000) . ");</script>";
-        }
+        $reloadScript = ($interval > 0) ? "<script>setTimeout(function(){ location.reload(); }, " . (($interval + 2) * 1000) . ");</script>" : "";
+        $highChartsScript = "<script src='https://code.highcharts.com/highcharts.js'></script>";
 
         $html = "
         <div style='container-type: inline-size; background-color: $bgColor; color: $fontColor; font-family: \"Segoe UI\", sans-serif; height: 100%; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 1.5cqi; border-radius: 8px;'>
+            $highChartsScript
             <div style='text-align: center; font-size: clamp(12px, 5cqi, 48px); font-weight: bold; padding-bottom: 1.5cqi; border-bottom: 1px solid rgba(255,255,255,0.2);'>
                 $stationName <span style='font-size: 0.6em; opacity: 0.6; margin-left: 2cqi;'>($timeStr)</span>
                 <div style='font-size: 0.4em; opacity: 0.8; font-weight: normal; margin-top: 0.5cqi;'>$sysCondStr</div>
@@ -389,6 +415,11 @@ class TempestWeatherStation extends IPSModule
             <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1cqi; flex-grow: 1; margin-top: 1.5cqi;'>
                 $itemsHtml
             </div>
+            <script>
+                (function() {
+                    $chartScripts
+                })();
+            </script>
             $reloadScript
         </div>";
 
