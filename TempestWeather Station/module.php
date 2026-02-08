@@ -84,7 +84,7 @@ class TempestWeatherStation extends IPSModule
     }
     private function RegisterHook($WebHook)
     {
-        $ids = IPS_GetInstanceListByModuleID('{015A6AFE-E061-4916-87A2-0D7290779C82}');
+        $ids = IPS_GetInstanceListByModuleID('{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}');
         if (count($ids) > 0) {
             $controlID = $ids[0];
             $hooks = json_decode(IPS_GetProperty($controlID, 'Hooks'), true);
