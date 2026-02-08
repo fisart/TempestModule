@@ -71,7 +71,7 @@ class TempestWeatherStation extends IPSModule
     {
         // Never delete this line!
         parent::ApplyChanges();
-        $this->SendDebug('ApplyChanges', 'Start execution', 0);
+        $this->LogMessage("ApplyChanges triggered", KL_MESSAGE);
 
         $this->UpdateProfiles();
         $this->RegisterHook($this->ReadPropertyString('WebhookPath'));
@@ -82,7 +82,6 @@ class TempestWeatherStation extends IPSModule
 
         $this->GenerateHTMLDashboard();
     }
-
     private function RegisterHook($WebHook)
     {
         $this->SendDebug('RegisterHook', 'Path: ' . $WebHook, 0);
