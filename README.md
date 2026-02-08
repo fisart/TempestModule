@@ -1,66 +1,75 @@
-To ensure a perfect transition to your new development thread, here is the detailed technical description of the **Weather Module Tempest (v3.1.0)**.
+This documentation describes the **Tempest Weather Station** module (v3.6.3) for IP-Symcon.
+
+### **1. Functionality / Funktionsumfang**
+
+**EN:**  
+The module acts as a local receiver for the Weatherflow Tempest Weather Station. It processes real-time data sent by the Tempest Hub via the UDP protocol and integrates it into the IP-Symcon ecosystem. Key features include advanced sensor data management, battery health analytics using linear regression, and a responsive, high-performance HTML5 dashboard with interactive Highcharts sparklines.
+
+**DE:**  
+Das Modul fungiert als lokaler Empfänger für die Weatherflow Tempest Wetterstation. Es verarbeitet Echtzeitdaten, die vom Tempest Hub über das UDP-Protokoll gesendet werden, und integriert diese in das IP-Symcon-Ökosystem. Zu den Hauptfunktionen gehören ein fortschrittliches Sensordatenmanagement, Analysen zum Batteriezustand mittels linearer Regression sowie ein responsives HTML5-Dashboard mit interaktiven Highcharts-Diagrammen.
 
 ---
 
-### English: Technical Documentation & Functional Overview
+### **2. Processes / Prozesse**
 
-**1. Core Functionality**
-The module is an object-oriented device driver for IP-Symcon designed to process local UDP broadcasts from the Weatherflow Tempest station. It transforms raw JSON packets into structured system variables and provides a modern, responsive HTML visualization.
+**EN:**
 
-**2. Data Processes**
+1.  **Data Acquisition:** Listens for incoming UDP JSON packets (Message types: `obs_st`, `rapid_wind`, `device_status`, `hub_status`, `evt_precip`, `evt_strike`).
+2.  **Integrity & Back-filling:** Compares incoming timestamps with existing archive data to prevent duplicates and allow "back-filling" of late-arriving historical packets.
+3.  **Battery Analytics:** Performs a "Least Squares" linear regression over a configurable number of battery voltage data points to determine the charge slope (Charging vs. Discharging).
+4.  **Hysteresis Logic:** Dynamically adjusts system profiles and colors based on battery performance and station operating modes.
+5.  **Visualization:** Generates a CSS-Grid-based HTML dashboard. It fetches historical data from the Archive Control to render 24h (configurable) sparklines using Highcharts.
+6.  **Secure Webhook:** Serves the dashboard as a Progressive Web App (PWA). It validates users via a linked "Secrets Manager" instance for secure remote access.
 
-- **UDP Reception & Dispatching:** The module acts as a Data Sink for a UDP Socket (Port 50222). It parses incoming JSON and routes it to specific handlers for observations (`obs_st`), device status, hub status, rapid wind, and event-based data (rain/lightning).
-- **Data Integrity Logic:**
-  - _Duplicate Detection:_ Prevents multiple entries of the same observation.
-  - _Back-filling:_ Detects late-arriving packets via timestamps and uses the Archive Control to insert data into the correct historical position, followed by automatic re-aggregation.
-- **Battery Analytics (Machine Learning):** Uses a **Least Squares Linear Regression** to calculate the voltage slope over a configurable number of data points. It implements a hysteresis logic to determine the "Battery Status" (Charging/Discharging) and dynamically adjusts variable profile associations based on the power state.
-- **Blueprint 2.0 UI Management:** Implements a stable dynamic configuration list using **RAM-Caching (Attributes)**. This bypasses the browser's form-buffer limitations, ensuring that variable selections for the dashboard are never lost.
+**DE:**
 
-**3. Input Data**
-
-- **Source:** Broadcasted JSON packets via UDP.
-- **Types:** `obs_st` (18+ weather metrics), `device_status` (voltage, rssi), `hub_status`, `rapid_wind`, `evt_precip`, `evt_strike`.
-- **Configuration:** User-defined station name, profile prefixes, regression parameters, and a coordinate-based grid selection list.
-
-**4. Output Data**
-
-- **System Variables:** Structured Floats, Integers, and Booleans for all weather data, technical deltas (`time_delta`, `stamp_delta`), and battery metrics.
-- **HTML Dashboard:** A responsive grid-based visualization served via an internal Webhook (`/hook/tempest`).
-- **Scaling:** Uses CSS Container Queries (`cqi`) and `clamp()` to scale fonts and layouts relative to the size of the HTML box in the visualization.
+1.  **Datenerfassung:** Lauscht auf eingehende UDP-JSON-Pakete (Typen: `obs_st`, `rapid_wind`, `device_status`, `hub_status`, `evt_precip`, `evt_strike`).
+2.  **Integrität & Back-filling:** Vergleicht Zeitstempel mit Archivdaten, um Duplikate zu verhindern und das "Back-filling" von verspätet eintreffenden historischen Paketen zu ermöglichen.
+3.  **Batterie-Analyse:** Führt eine „Least Squares“ lineare Regression über eine konfigurierbare Anzahl von Spannungswerten durch, um die Steigung (Laden vs. Entladen) zu bestimmen.
+4.  **Hysterese-Logik:** Passt Systemprofile und Farben dynamisch basierend auf der Batterieleistung und den Betriebsmodi der Station an.
+5.  **Visualisierung:** Erzeugt ein CSS-Grid-basiertes HTML-Dashboard. Es ruft historische Daten aus der Archivsteuerung ab, um 24h-Diagramme (konfigurierbar) mittels Highcharts zu rendern.
+6.  **Sicherer Webhook:** Stellt das Dashboard als Progressive Web App (PWA) bereit. Zur Sicherheit wird der Zugriff über eine verknüpfte „Secrets Manager“-Instanz validiert.
 
 ---
 
-### Deutsch: Technische Dokumentation & Funktionsübersicht
+### **3. Input Data / Eingangsdaten**
 
-**1. Kernfunktionalität**
-Das Modul ist ein objektorientierter Gerätetreiber für IP-Symcon zur Verarbeitung lokaler UDP-Broadcasts der Weatherflow Tempest Station. Es wandelt rohe JSON-Pakete in strukturierte Systemvariablen um und bietet eine moderne, responsive HTML-Visualisierung.
+**EN:**
 
-**2. Datenprozesse**
+- **UDP Packets:** JSON formatted strings from the Tempest Hub (Port 50222).
+- **Archive Data:** Historical values for battery voltage and sensor idents (used for regression and charts).
+- **Configuration:** User-defined properties (Profile prefixes, Dashboard layout, Secrets Manager ID).
+- **Secrets:** Credentials (User/Password) fetched dynamically from the Secrets Manager for Webhook authentication.
 
-- **UDP-Empfang & Dispatching:** Das Modul fungiert als Data Sink für einen UDP-Socket (Port 50222). Es parst eingehendes JSON und leitet es an spezifische Handler für Beobachtungen (`obs_st`), Gerätestatus, Hub-Status, Rapid Wind und ereignisbasierte Daten (Regen/Blitz) weiter.
-- **Daten-Integritätslogik:**
-  - _Duplikaterkennung:_ Verhindert Mehrfacheinträge derselben Beobachtung.
-  - _Back-filling:_ Erkennt verspätete Pakete anhand von Zeitstempeln und nutzt das Archiv, um Daten an der korrekten historischen Position einzufügen, gefolgt von einer automatischen Re-Aggregation.
-- **Batterie-Analyse (Machine Learning):** Verwendet eine **Lineare Regression (Least Squares)**, um die Spannungsteigung über eine konfigurierbare Anzahl von Datenpunkten zu berechnen. Eine Hystereselogik bestimmt den "Batteriestatus" (Laden/Entladen) und passt die Profil-Assoziationen der Variablen dynamisch an den Energiezustand an.
-- **Blueprint 2.0 UI-Management:** Implementiert eine stabile dynamische Konfigurationsliste mittels **RAM-Caching (Attributen)**. Dies umgeht die Puffer-Einschränkungen des Browsers und garantiert, dass Variablenauswahlen für das Dashboard niemals verloren gehen.
+**DE:**
 
-**3. Eingangsdaten**
-
-- **Quelle:** Über UDP gesendete JSON-Pakete.
-- **Typen:** `obs_st` (18+ Wettermetriken), `device_status` (Spannung, RSSI), `hub_status`, `rapid_wind`, `evt_precip`, `evt_strike`.
-- **Konfiguration:** Benutzerdefinierter Stationsname, Profil-Präfixe, Regressionsparameter und eine koordinatenbasierte Grid-Auswahlliste.
-
-**4. Ausgangsdaten**
-
-- **Systemvariablen:** Strukturierte Floats, Integer und Booleans für alle Wetterdaten, technische Deltas (`time_delta`, `stamp_delta`) und Batteriekennzahlen.
-- **HTML-Dashboard:** Eine responsive, rasterbasierte Visualisierung, die über einen internen Webhook (`/hook/tempest`) bereitgestellt wird.
-- **Skalierung:** Nutzt CSS Container Queries (`cqi`) und `clamp()`, um Schriftarten und Layouts relativ zur Größe der HTML-Box in der Visualisierung zu skalieren.
+- **UDP-Pakete:** JSON-formatierte Strings vom Tempest Hub (Port 50222).
+- **Archivdaten:** Historische Werte für Batteriespannung und Sensoren (genutzt für Regression und Diagramme).
+- **Konfiguration:** Benutzerdefinierte Eigenschaften (Profil-Präfixe, Dashboard-Layout, Secrets Manager ID).
+- **Secrets:** Zugangsdaten (Benutzer/Passwort), die dynamisch aus dem Secrets Manager für die Webhook-Authentifizierung abgerufen werden.
 
 ---
 
-### Summary of Agreed Future Changes (Highcharts)
+### **4. Output Data / Ausgangsdaten**
 
-- **Integration:** Replace or augment text values in the HTML grid with **Highcharts** sparklines.
-- **Configuration:** Expand `form.json` with a "Show Chart" toggle per variable and global timeframe settings.
-- **Data Source:** Use `AC_GetLoggedValues` to feed the Highcharts JS series directly from the module's backend.
-- **Infrastructure:** The internal module Webhook will handle all script-less rendering.
+**EN:**
+
+- **Status Variables:** Over 26 variables including Temperature, Humidity, Pressure, Wind (Avg/Gust/Lull/Dir), UV, Solar Radiation, and Lightning strikes.
+- **Diagnostic Variables:** Battery Voltage, Regression Slope, System Condition (Charge/Discharge), and Signal Strength (RSSI).
+- **Dashboard (HTMLBox):** A formatted HTML string for use in the IP-Symcon WebFront or Tile Visualizer.
+- **Webhook (PWA):** A standalone web endpoint `/hook/tempest` providing a full-screen mobile experience with app manifest and icons.
+
+**DE:**
+
+- **Statusvariablen:** Über 26 Variablen, darunter Temperatur, Luftfeuchtigkeit, Druck, Wind (Schnitt/Böe/Ruhe/Richtung), UV, Sonnenstrahlung und Blitzeinschläge.
+- **Diagnosevariablen:** Batteriespannung, Regressionssteigung, Systemzustand (Laden/Entladen) und Signalstärke (RSSI).
+- **Dashboard (HTMLBox):** Ein formatierter HTML-String zur Verwendung im IP-Symcon WebFront oder Tile Visualizer.
+- **Webhook (PWA):** Ein eigenständiger Web-Endpunkt `/hook/tempest`, der eine Vollbild-App-Erfahrung inklusive Manifest und Icons bietet.
+
+---
+
+### Version Management
+
+- **Old Version:** 3.6.3
+- **New Version:** 3.7.0
+- **Commit Message:** `docs: add detailed functionality and data flow description in English and German`
