@@ -71,9 +71,11 @@ class TempestWeatherStation extends IPSModule
     {
         // Never delete this line!
         parent::ApplyChanges();
+        $this->SendDebug('ApplyChanges', 'Start execution', 0);
 
         $this->UpdateProfiles();
         $this->RegisterHook($this->ReadPropertyString('WebhookPath'));
+
         // Manage Dashboard Timer (v2.10.0 logic)
         $interval = $this->ReadPropertyBoolean('EnableHTML') ? $this->ReadPropertyInteger('HTMLUpdateInterval') : 0;
         $this->SetTimerInterval('UpdateDashboardTimer', $interval * 1000);
