@@ -84,8 +84,9 @@ class TempestWeatherStation extends IPSModule
     }
     private function RegisterHook($WebHook)
     {
-        $controlID = 18788; // Targeted ID confirmed by user
-        if (IPS_InstanceExists($controlID)) {
+        $ids = IPS_GetInstanceListByModuleID('{015A6AFE-E061-4916-87A2-0D7290779C82}');
+        if (count($ids) > 0) {
+            $controlID = $ids[0];
             $hooks = json_decode(IPS_GetProperty($controlID, 'Hooks'), true);
             if (!is_array($hooks)) $hooks = [];
 
@@ -108,7 +109,7 @@ class TempestWeatherStation extends IPSModule
             IPS_ApplyChanges($controlID);
             $this->LogMessage("Webhook registered: " . $WebHook, KL_MESSAGE);
         } else {
-            $this->LogMessage("Error: WebHook Control 18788 not found", KL_ERROR);
+            $this->LogMessage("Error: WebHook Control not found", KL_ERROR);
         }
     }
 
