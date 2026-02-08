@@ -677,7 +677,7 @@ class TempestWeatherStation extends IPSModule
         // 2. Add any newly discovered variables
         foreach ($masterMetadata as $ident => $label) {
             if (!in_array($ident, $existingIdents)) {
-                $newList[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
+                $newList[] = ['Label' => $label, 'Show' => false, 'ShowChart' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
             }
         }
 
@@ -745,7 +745,7 @@ class TempestWeatherStation extends IPSModule
         $c = 1;
         foreach ($master as $ident => $label) {
             if (!in_array($ident, $existingIdents)) {
-                $values[] = ['Label' => $label, 'Show' => false, 'Row' => $r, 'Col' => $c, 'Ident' => $ident];
+                $values[] = ['Label' => $label, 'Show' => false, 'ShowChart' => false, 'Row' => $r, 'Col' => $c, 'Ident' => $ident];
                 $c++;
                 if ($c > 4) {
                     $c = 1;
@@ -795,10 +795,10 @@ class TempestWeatherStation extends IPSModule
 
         foreach ($newData as $row) {
             if (isset($row['Ident'])) {
-                // Blueprint 2.0: Explicit casting to satisfy NumberSpinner and Sorting
                 $row['Row'] = (int)$row['Row'];
                 $row['Col'] = (int)$row['Col'];
                 $row['Show'] = (bool)$row['Show'];
+                $row['ShowChart'] = (bool)($row['ShowChart'] ?? false);
                 $map[$row['Ident']] = $row;
             }
         }
