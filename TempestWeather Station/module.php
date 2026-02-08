@@ -119,7 +119,7 @@ class TempestWeatherStation extends IPSModule
     /**
      * This function is called by the Webhook Bot
      */
-    public function ProcessHookData()
+    protected function ProcessHookData(): void
     {
         // 1. Web App Manifest Handler
         if (isset($_GET['manifest'])) {
@@ -173,6 +173,8 @@ class TempestWeatherStation extends IPSModule
     <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
     <title>$title</title>
     <link rel='manifest' href='?manifest=1'>
+    <link rel='apple-touch-icon' href='https://weatherflow.github.io/Tempest/img/tempest-icon-192.png'>
+    <meta name='theme-color' content='$bgColor'>
     <meta name='apple-mobile-web-app-capable' content='yes'>
     <meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'>
     <meta name='mobile-web-app-capable' content='yes'>
