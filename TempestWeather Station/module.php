@@ -119,7 +119,7 @@ class TempestWeatherStation extends IPSModule
     /**
      * This function is called by the Webhook Bot
      */
-    protected function ProcessHookData(): void
+    protected function ProcessHookData()
     {
         // 1. Web App Manifest Handler
         if (isset($_GET['manifest'])) {
