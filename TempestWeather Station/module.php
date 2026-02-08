@@ -32,6 +32,8 @@ class TempestWeatherStation extends IPSModule
         $this->RegisterPropertyInteger('HTMLUpdateInterval', 0);
         $this->RegisterPropertyInteger('HTMLBackgroundColor', 0x222222);
         $this->RegisterPropertyInteger('HTMLFontColor', 0xFFFFFF);
+        $this->RegisterPropertyInteger('ChartTimeframe', 24);
+        $this->RegisterPropertyInteger('ChartColor', 0xFFFFFF);
         $this->RegisterPropertyString('HTMLVariableList', json_encode([
             ['Label' => 'Temperature', 'Show' => true, 'Row' => 1, 'Col' => 1, 'Ident' => 'Air_Temperature'],
             ['Label' => 'Humidity', 'Show' => true, 'Row' => 1, 'Col' => 2, 'Ident' => 'Relative_Humidity'],
@@ -349,6 +351,8 @@ class TempestWeatherStation extends IPSModule
         $fontColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLFontColor'));
         $varList = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
         $interval = $this->ReadPropertyInteger('HTMLUpdateInterval');
+        $chartTimeframe = $this->ReadPropertyInteger('ChartTimeframe');
+        $chartColor = sprintf("#%06X", $this->ReadPropertyInteger('ChartColor'));
 
         $timeID = @$this->GetIDForIdent('Time_Epoch');
         $timeStr = ($timeID && IPS_VariableExists($timeID)) ? date('H:i:s', GetValue($timeID)) : '--:--:--';
@@ -372,7 +376,7 @@ class TempestWeatherStation extends IPSModule
             $chartHtml = "";
 
             if (($item['ShowChart'] ?? false) && AC_GetLoggingStatus($archiveID, $varID)) {
-                $history = AC_GetLoggedValues($archiveID, $varID, time() - 86400, time(), 0);
+                $history = AC_GetLoggedValues($archiveID, $varID, time() - ($chartTimeframe * 3600), time(), 0);
                 if (count($history) > 1) {
                     $points = [];
                     foreach (array_reverse($history) as $row) {
@@ -388,7 +392,7 @@ class TempestWeatherStation extends IPSModule
                         title: { text: null }, credits: { enabled: false }, legend: { enabled: false },
                         xAxis: { visible: false }, yAxis: { visible: false },
                         tooltip: { enabled: false },
-                        plotOptions: { series: { marker: { enabled: false }, lineWidth: 1, fillOpacity: 0.1, color: '$fontColor', animation: false } },
+                        plotOptions: { series: { marker: { enabled: false }, lineWidth: 1, fillOpacity: 0.1, color: '$chartColor', animation: false } },
                         series: [{ data: [$dataString] }]
                     });";
                 }

@@ -27,6 +27,8 @@
             { "type": "SelectColor", "name": "HTMLBackgroundColor", "caption": "Background Color" },
             { "type": "SelectColor", "name": "HTMLFontColor", "caption": "Font Color" },
             { "type": "NumberSpinner", "name": "HTMLUpdateInterval", "caption": "Update Interval (seconds)", "minimum": 0 },
+            { "type": "NumberSpinner", "name": "ChartTimeframe", "caption": "Chart Timeframe (hours)", "minimum": 1, "maximum": 168 },
+{ "type": "SelectColor", "name": "ChartColor", "caption": "Chart Line Color" },
             {
                 "type": "List",
                 "name": "HTMLVariableList",
