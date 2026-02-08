@@ -64,6 +64,8 @@ class TempestWeatherStation extends IPSModule
         $this->RegisterPropertyBoolean('MsgRapidWind', true);
         $this->RegisterPropertyBoolean('MsgPrecip', true);
         $this->RegisterPropertyBoolean('MsgStrike', true);
+
+        $this->RegisterPropertyString('WebhookPath', '/hook/tempest');
     }
 
     public function ApplyChanges()
@@ -72,7 +74,7 @@ class TempestWeatherStation extends IPSModule
         parent::ApplyChanges();
 
         $this->UpdateProfiles();
-
+        $this->RegisterWebhook($this->ReadPropertyString('WebhookPath'));
         // Manage Dashboard Timer (v2.10.0 logic)
         $interval = $this->ReadPropertyBoolean('EnableHTML') ? $this->ReadPropertyInteger('HTMLUpdateInterval') : 0;
         $this->SetTimerInterval('UpdateDashboardTimer', $interval * 1000);
@@ -80,6 +82,35 @@ class TempestWeatherStation extends IPSModule
         $this->GenerateHTMLDashboard();
     }
 
+    private function RegisterWebhook($WebHook)
+    {
+        $ids = IPS_GetInstanceListByModuleID('{015A6AFE-E061-4916-87A2-0D7290779C82}');
+        if (count($ids) > 0) {
+            $hooks = json_decode(IPS_GetProperty($ids[0], 'Hooks'), true);
+            $found = false;
+            foreach ($hooks as $index => $hook) {
+                if ($hook['Hook'] == $WebHook) {
+                    if ($hook['TargetID'] == $this->InstanceID) {
+                        $found = true;
+                    }
+                }
+            }
+            if (!$found) {
+                $hooks[] = ['Hook' => $WebHook, 'TargetID' => $this->InstanceID];
+                IPS_SetProperty($ids[0], 'Hooks', json_encode($hooks));
+                IPS_ApplyChanges($ids[0]);
+            }
+        }
+    }
+
+    /**
+     * This function is called by the Webhook Bot
+     */
+    public function ProcessHook()
+    {
+        header('Content-Type: text/plain; charset=utf-8');
+        echo "Tempest Webhook is active. Instance ID: " . $this->InstanceID;
+    }
 
 
     public function ReceiveData($JSONString)
