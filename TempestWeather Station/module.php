@@ -81,12 +81,33 @@ class TempestWeatherStation extends IPSModule
         $this->GenerateHTMLDashboard();
     }
 
-
+    private function RegisterHook($WebHook)
+    {
+        $ids = IPS_GetInstanceListByModuleID('{015A6AFE-E061-4916-87A2-0D7290779C82}');
+        if (count($ids) > 0) {
+            $hooks = json_decode(IPS_GetProperty($ids[0], 'Hooks'), true);
+            $found = false;
+            foreach ($hooks as $index => $hook) {
+                if ($hook['Hook'] == $WebHook) {
+                    if ($hook['TargetID'] == $this->InstanceID) {
+                        return; // Already registered correctly
+                    }
+                    $hooks[$index]['TargetID'] = $this->InstanceID;
+                    $found = true;
+                }
+            }
+            if (!$found) {
+                $hooks[] = ['Hook' => $WebHook, 'TargetID' => $this->InstanceID];
+            }
+            IPS_SetProperty($ids[0], 'Hooks', json_encode($hooks));
+            IPS_ApplyChanges($ids[0]);
+        }
+    }
 
     /**
      * This function is called by the Webhook Bot
      */
-    public function ProcessHook()
+    public function ProcessHookData()
     {
         header('Content-Type: text/plain; charset=utf-8');
         echo "Tempest Webhook is active. Instance ID: " . $this->InstanceID;
