@@ -7,7 +7,7 @@ require_once __DIR__ . '/../libs/RegressionHelper.php';
 /**
  * TempestWeatherStation Class
  * Handles data from Weatherflow Tempest via UDP.
- * Version 2.12.1
+ * Version 2.12.2
  */
 class TempestWeatherStation extends IPSModule
 {
@@ -328,10 +328,12 @@ class TempestWeatherStation extends IPSModule
             if (!isset($data[$name]) || is_array($data[$name])) continue;
             $val = $data[$name];
             $ident = 'dev_' . str_replace(' ', '_', $name);
+
             if ($name == 'sensor_status') $val = $val & bindec('111111111');
 
             $profileIdent = $this->GetProfileForName($name);
-            $this->MaintainVariable($ident, $name, $config['profiles'][$profileIdent]['type'], $prefix . $profileIdent, $index + 50, true);
+            // Fix: Use MaintainVariableSafe to force change from String to Integer
+            $this->MaintainVariableSafe($ident, $name, $config['profiles'][$profileIdent]['type'], $prefix . $profileIdent, $index + 50, true);
             $this->HandleValueUpdate($ident, $val, $timestamp, 'NEW_VALUE');
         }
     }
@@ -484,7 +486,48 @@ class TempestWeatherStation extends IPSModule
 
     private function GetProfileForName(string $name)
     {
-        $mapping = ['Air Temperature' => 'celcius', 'Relative Humidity' => 'percent', 'Wind Avg' => 'km_pro_stunde', 'Wind Lull' => 'km_pro_stunde', 'Wind Gust' => 'km_pro_stunde', 'Wind Speed' => 'km_pro_stunde', 'Battery' => 'volt', 'voltage' => 'volt', 'Average' => 'volt', 'Median' => 'volt', 'Time Epoch' => 'UnixTimestamp', 'timestamp' => 'UnixTimestamp', 'Rain Start Event' => 'UnixTimestamp', 'Station Pressure' => 'milli_bar', 'Wind Direction' => 'wind_direction', 'Illuminance' => 'lux', 'UV' => 'index', 'Solar Radiation' => 'energy', 'Energy' => 'energy', 'Precip Accumulated' => 'mm', 'Precipitation Type' => 'perception_type', 'Lightning Strike Avg Distance' => 'km', 'Distance' => 'km', 'Lightning Strike Count' => 'seconds', 'Report Interval' => 'minutes', 'Wind Sample Interval' => 'seconds', 'time_delta' => 'seconds', 'stamp_delta' => 'seconds', 'uptime' => 'seconds', 'rssi' => 'rssi', 'hub_rssi' => 'rssi', 'Radio Status' => 'Radio_Status', 'Slope' => 'slope', 'Battery Status' => 'battery_status', 'System Condition' => 'system_condition'];
+        $mapping = [
+            'Air Temperature'               => 'celcius',
+            'Relative Humidity'             => 'percent',
+            'Wind Avg'                      => 'km_pro_stunde',
+            'Wind Lull'                     => 'km_pro_stunde',
+            'Wind Gust'                     => 'km_pro_stunde',
+            'Wind Speed'                    => 'km_pro_stunde',
+            'Battery'                       => 'volt',
+            'voltage'                       => 'volt',
+            'Average'                       => 'volt',
+            'Median'                        => 'volt',
+            'Average Voltage'               => 'volt',
+            'Median Voltage'                => 'volt',
+            'Time Epoch'                    => 'UnixTimestamp',
+            'timestamp'                     => 'UnixTimestamp',
+            'Rain Start Event'              => 'UnixTimestamp',
+            'Station Pressure'              => 'milli_bar',
+            'Wind Direction'                => 'wind_direction',
+            'Illuminance'                   => 'lux',
+            'UV'                            => 'index',
+            'Solar Radiation'               => 'energy',
+            'Energy'                        => 'energy',
+            'Precip Accumulated'            => 'mm',
+            'Precipitation Type'            => 'perception_type',
+            'Lightning Strike Avg Distance' => 'km',
+            'Lightning Strike Count'        => 'seconds',
+            'Distance'                      => 'km',
+            'Report Interval'               => 'minutes',
+            'Wind Sample Interval'          => 'seconds',
+            'time_delta'                    => 'seconds',
+            'stamp_delta'                   => 'seconds',
+            'uptime'                        => 'seconds',
+            'rssi'                          => 'rssi',
+            'hub_rssi'                      => 'rssi',
+            'Radio Status'                  => 'Radio_Status',
+            'Slope'                         => 'slope',
+            'Regression Slope'              => 'slope',
+            'Battery Status'                => 'battery_status',
+            'System Condition'              => 'system_condition',
+            // Fix: Map sensor_status to the status profile
+            'sensor_status'                 => 'status'
+        ];
         return $mapping[$name] ?? 'text';
     }
 
