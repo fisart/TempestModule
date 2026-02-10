@@ -74,16 +74,21 @@ class TempestWeatherStation extends IPSModule
     {
         // Never delete this line!
         parent::ApplyChanges();
-        $this->LogMessage("ApplyChanges triggered", KL_MESSAGE);
 
         $this->UpdateProfiles();
-        $this->RegisterHook($this->ReadPropertyString('WebhookPath'));
 
-        // Manage Dashboard Timer (v2.10.0 logic)
+        // Register for Kernel Started message
+        $this->RegisterMessage(0, IPS_KERNELSTARTED);
+
+        // Manage Dashboard Timer
         $interval = $this->ReadPropertyBoolean('EnableHTML') ? $this->ReadPropertyInteger('HTMLUpdateInterval') : 0;
         $this->SetTimerInterval('UpdateDashboardTimer', $interval * 1000);
 
-        $this->GenerateHTMLDashboard();
+        // Only proceed with instance-dependent logic if Kernel is ready
+        if (IPS_GetKernelRunlevel() == 10103) {
+            $this->RegisterHook($this->ReadPropertyString('WebhookPath'));
+            $this->GenerateHTMLDashboard();
+        }
     }
     private function RegisterHook($WebHook)
     {
@@ -281,6 +286,18 @@ class TempestWeatherStation extends IPSModule
             $this->UpdateBatteryLogic((float)$obs[16]);
         }
     }
+
+
+    public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
+    {
+        switch ($Message) {
+            case IPS_KERNELSTARTED:
+                $this->RegisterHook($this->ReadPropertyString('WebhookPath'));
+                $this->GenerateHTMLDashboard();
+                break;
+        }
+    }
+
     public function EnableLogging()
     {
         $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
