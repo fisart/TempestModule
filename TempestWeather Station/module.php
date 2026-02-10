@@ -80,6 +80,9 @@ class TempestWeatherStation extends IPSModule
         // Register for Kernel Started message
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
 
+        // Set Receive Filter for supported Tempest UDP packet types (Rule 4.1)
+        $this->SetReceiveDataFilter('.*"type"\s*:\s*"(obs_st|device_status|hub_status|rapid_wind|evt_precip|evt_strike)".*');
+
         // Manage Dashboard Timer
         $interval = $this->ReadPropertyBoolean('EnableHTML') ? $this->ReadPropertyInteger('HTMLUpdateInterval') : 0;
         $this->SetTimerInterval('UpdateDashboardTimer', $interval * 1000);
@@ -90,6 +93,7 @@ class TempestWeatherStation extends IPSModule
             $this->GenerateHTMLDashboard();
         }
     }
+
     private function RegisterHook($WebHook)
     {
         $ids = IPS_GetInstanceListByModuleID('{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}');
