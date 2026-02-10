@@ -37,7 +37,6 @@
             { "type": "SelectColor", "name": "HTMLFontColor", "caption": "Font Color" },
             { "type": "NumberSpinner", "name": "HTMLUpdateInterval", "caption": "Update Interval (seconds)", "minimum": 0 },
             { "type": "NumberSpinner", "name": "ChartTimeframe", "caption": "Chart Timeframe (hours)", "minimum": 1, "maximum": 168 },
-            { "type": "NumberSpinner", "name": "ChartTimeframe", "caption": "Chart Timeframe (hours)", "minimum": 1, "maximum": 168 },
             { "type": "SelectColor", "name": "ChartColor", "caption": "Chart Line Color" },
             {
                 "type": "List",
@@ -51,6 +50,7 @@
                     { "caption": "Show", "name": "Show", "width": "60px", "edit": { "type": "CheckBox" } },
                     { "caption": "Chart", "name": "ShowChart", "width": "60px", "edit": { "type": "CheckBox" } },
                     { "caption": "Row", "name": "Row", "width": "80px", "edit": { "type": "NumberSpinner", "minimum": 1, "maximum": 10 } },
+                    { "caption": "Col", "name": "Col", "width": "80px", "edit": { "type": "NumberSpinner", "minimum": 1, "maximum": 4 } },
                     { "caption": "Ident", "name": "Ident", "width": "0px" }
                 ]
             }
