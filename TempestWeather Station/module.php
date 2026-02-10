@@ -334,7 +334,10 @@ class TempestWeatherStation extends IPSModule
         $prefix = $this->ReadPropertyString('ProfilePrefix');
 
         $batteryID = @$this->GetIDForIdent('Battery');
-        if (!$batteryID) return;
+        if ($batteryID === 0) {
+            $this->LogMessage("UpdateBatteryLogic: 'Battery' variable not found. Regression aborted.", KL_ERROR);
+            return;
+        }
 
         if (!AC_GetLoggingStatus($archiveID, $batteryID)) {
             $this->LogMessage("Battery Regression: Archive Logging is disabled for 'Battery'. No data available for calculation.", KL_WARNING);
@@ -342,7 +345,12 @@ class TempestWeatherStation extends IPSModule
         }
 
         $history = @AC_GetLoggedValues($archiveID, $batteryID, time() - 86400, time(), $nrPoints);
-        if (!is_array($history) || count($history) < 5) return;
+        if (!is_array($history)) {
+            $this->LogMessage("UpdateBatteryLogic: Failed to retrieve archive data for 'Battery'.", KL_ERROR);
+            return;
+        }
+
+        if (count($history) < 5) return;
 
         $x = [];
         $y = [];
