@@ -8,7 +8,8 @@
         { "type": "ExpansionPanel", "caption": "Battery Regression (Experimental)", "items": [
             { "type": "CheckBox", "name": "ExperimentalRegression", "caption": "Enable Battery Hysteresis Logic" },
             { "type": "NumberSpinner", "name": "TriggerValueSlope", "caption": "Trigger Value Slope (m)", "digits": 6 },
-            { "type": "NumberSpinner", "name": "RegressionDataPoints", "caption": "Number of Datapoints", "minimum": 5, "maximum": 500 }
+            { "type": "NumberSpinner", "name": "RegressionDataPoints", "caption": "Number of Datapoints", "minimum": 5, "maximum": 500 },
+            { "type": "Label", "caption": "⚠️ WARNING: Battery Analytics and Dashboard Charts require Archive Logging to be enabled for the respective variables.", "color": "#FF0000" }
         ]},
         { "type": "ExpansionPanel", "caption": "Variable Selection (Observations)", "items": [
             { "type": "CheckBox", "name": "Var_Wind", "caption": "Wind (Avg, Lull, Gust, Dir, Interval)", "value": true },
@@ -28,7 +29,7 @@
             { "type": "SelectColor", "name": "HTMLFontColor", "caption": "Font Color" },
             { "type": "NumberSpinner", "name": "HTMLUpdateInterval", "caption": "Update Interval (seconds)", "minimum": 0 },
             { "type": "NumberSpinner", "name": "ChartTimeframe", "caption": "Chart Timeframe (hours)", "minimum": 1, "maximum": 168 },
-{ "type": "SelectColor", "name": "ChartColor", "caption": "Chart Line Color" },
+            { "type": "SelectColor", "name": "ChartColor", "caption": "Chart Line Color" },
             {
                 "type": "List",
                 "name": "HTMLVariableList",
@@ -49,6 +50,7 @@
     ],
     "actions": [
         { "type": "Button", "label": "💾 SAVE DASHBOARD SELECTION", "onClick": "TMT_SaveSelections($id);" },
-        { "type": "Button", "label": "Update Profiles Now", "onClick": "TMT_UpdateProfiles($id);" }
+        { "type": "Button", "label": "Update Profiles Now", "onClick": "TMT_UpdateProfiles($id);" },
+        { "type": "Button", "label": "Initialize Required Archive Logging", "onClick": "TMT_EnableLogging($id);" }
     ]
 }

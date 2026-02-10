@@ -281,7 +281,30 @@ class TempestWeatherStation extends IPSModule
             $this->UpdateBatteryLogic((float)$obs[16]);
         }
     }
+    public function EnableLogging()
+    {
+        $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
 
+        // 1. Enable for Battery (required for Regression)
+        $batteryID = @$this->GetIDForIdent('Battery');
+        if ($batteryID) {
+            AC_SetLoggingStatus($archiveID, $batteryID, true);
+        }
+
+        // 2. Enable for Chart variables
+        $varList = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
+        foreach ($varList as $item) {
+            if ($item['ShowChart'] ?? false) {
+                $varID = @$this->GetIDForIdent($item['Ident']);
+                if ($varID) {
+                    AC_SetLoggingStatus($archiveID, $varID, true);
+                }
+            }
+        }
+
+        IPS_ApplyChanges($archiveID);
+        echo "Archive logging has been enabled for the Battery and all selected Chart variables.";
+    }
     private function UpdateBatteryLogic(float $currentVoltage)
     {
         $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
@@ -293,8 +316,7 @@ class TempestWeatherStation extends IPSModule
         if (!$batteryID) return;
 
         if (!AC_GetLoggingStatus($archiveID, $batteryID)) {
-            AC_SetLoggingStatus($archiveID, $batteryID, true);
-            IPS_ApplyChanges($archiveID);
+            $this->LogMessage("Battery Regression: Archive Logging is disabled for 'Battery'. No data available for calculation.", KL_WARNING);
             return;
         }
 
