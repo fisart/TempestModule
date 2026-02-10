@@ -29,8 +29,8 @@ class TempestWeatherStation extends IPSModule
         $this->RegisterPropertyInteger('RegressionDataPoints', 45);
 
         $this->RegisterPropertyInteger('AuthMode', 0);
-$this->RegisterPropertyString('WebhookUser', '');
-$this->RegisterPropertyString('WebhookPassword', '');
+        $this->RegisterPropertyString('WebhookUser', '');
+        $this->RegisterPropertyString('WebhookPassword', '');
 
         // Visualization & Dashboard
         $this->RegisterPropertyBoolean('EnableHTML', true);
@@ -83,7 +83,7 @@ $this->RegisterPropertyString('WebhookPassword', '');
         $this->UpdateProfiles();
 
         $this->UpdateUI();
-        
+
         // Register for Kernel Started message
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
 
@@ -135,7 +135,7 @@ $this->RegisterPropertyString('WebhookPassword', '');
     /**
      * This function is called by the Webhook Bot
      */
-protected function ProcessHookData()
+    protected function ProcessHookData()
     {
         // 1. Web App Manifest Handler
         if (isset($_GET['manifest'])) {
@@ -217,7 +217,7 @@ protected function ProcessHookData()
     </div>
 </body>
 </html>";
-    }
+
 
         // 2. Basic Auth Validation via Secrets Manager
         $secretsID = $this->ReadPropertyInteger('SecretsInstanceID');
@@ -267,6 +267,7 @@ protected function ProcessHookData()
 </body>
 </html>";
     }
+
 
     public function ReceiveData($JSONString)
     {
@@ -935,10 +936,10 @@ protected function ProcessHookData()
         return $master;
     }
 
-public function GetConfigurationForm()
+    public function GetConfigurationForm()
     {
         $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
-        
+
         // --- Auth Visibility Logic ---
         $authMode = $this->ReadPropertyInteger('AuthMode');
         foreach ($form['elements'] as &$panel) {
@@ -970,12 +971,16 @@ public function GetConfigurationForm()
             }
         }
 
-        $r = 1; $c = 1;
+        $r = 1;
+        $c = 1;
         foreach ($master as $ident => $label) {
             if (!in_array($ident, $existingIdents)) {
                 $values[] = ['Label' => $label, 'Show' => false, 'ShowChart' => false, 'Row' => $r, 'Col' => $c, 'Ident' => $ident];
                 $c++;
-                if ($c > 4) { $c = 1; $r++; }
+                if ($c > 4) {
+                    $c = 1;
+                    $r++;
+                }
             }
         }
 
@@ -1004,12 +1009,12 @@ public function GetConfigurationForm()
     public function UpdateUI()
     {
         $authMode = $this->ReadPropertyInteger('AuthMode');
-        
+
         // Toggle visibility based on selected mode
         // Mode 1 = Manual
         $this->UpdateFormField('WebhookUser', 'visible', ($authMode === 1));
         $this->UpdateFormField('WebhookPassword', 'visible', ($authMode === 1));
-        
+
         // Mode 2 = Secrets Manager
         $this->UpdateFormField('SecretsInstanceID', 'visible', ($authMode === 2));
     }
