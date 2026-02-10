@@ -495,8 +495,8 @@ class TempestWeatherStation extends IPSModule
     private function HandleValueUpdate(string $ident, $value, int $timestamp, string $check)
     {
         if ($value === null) return;
-        $varID = $this->GetIDForIdent($ident);
-        if ($varID === 0) {
+        $varID = @$this->GetIDForIdent($ident);
+        if ($varID === false || $varID === 0 || !IPS_VariableExists($varID)) {
             $this->LogMessage("HandleValueUpdate: Variable Ident '" . $ident . "' not found.", KL_WARNING);
             return;
         }
