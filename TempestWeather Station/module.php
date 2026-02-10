@@ -797,7 +797,7 @@ class TempestWeatherStation extends IPSModule
         // 2. Add any newly discovered variables
         foreach ($masterMetadata as $ident => $label) {
             if (!in_array($ident, $existingIdents)) {
-                $newList[] = ['Label' => $label, 'Show' => false, 'ShowChart' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
+                $newList[] = ['Label' => $label, 'Show' => false, 'Row' => 1, 'Col' => 1, 'Ident' => $ident];
             }
         }
 
