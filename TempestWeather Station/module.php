@@ -610,14 +610,16 @@ class TempestWeatherStation extends IPSModule
 
     private function CheckTimestamp(string $ident, int $timestamp)
     {
-        $varID = $this->GetIDForIdent($ident);
+        $varID = @$this->GetIDForIdent($ident);
         if ($varID === 0) return 'NEW_VALUE';
 
         $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
         if (!AC_GetLoggingStatus($archiveID, $varID)) return 'NEW_VALUE';
         if ($timestamp > time()) return 'INVALID';
+
         $lastValues = AC_GetLoggedValues($archiveID, $varID, $timestamp - 1, $timestamp + 1, 1);
         if (!empty($lastValues) && $lastValues[0]['Value'] == $timestamp) return 'INVALID';
+
         return ($timestamp < IPS_GetVariable($varID)['VariableUpdated']) ? 'OLD_TIME_STAMP' : 'NEW_VALUE';
     }
 
