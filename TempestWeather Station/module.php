@@ -407,11 +407,11 @@ class TempestWeatherStation extends IPSModule
         $chartTimeframe = $this->ReadPropertyInteger('ChartTimeframe');
         $chartColor = sprintf("#%06X", $this->ReadPropertyInteger('ChartColor'));
 
-        $timeID = @$this->GetIDForIdent('Time_Epoch');
-        $timeStr = ($timeID && IPS_VariableExists($timeID)) ? date('H:i:s', GetValue($timeID)) : '--:--:--';
+        $timeID = $this->GetIDForIdent('Time_Epoch');
+        $timeStr = ($timeID !== 0 && IPS_VariableExists($timeID)) ? date('H:i:s', GetValue($timeID)) : '--:--:--';
 
-        $sysCondID = @$this->GetIDForIdent('System_Condition');
-        $sysCondStr = ($sysCondID && IPS_VariableExists($sysCondID)) ? GetValueFormatted($sysCondID) : '';
+        $sysCondID = $this->GetIDForIdent('System_Condition');
+        $sysCondStr = ($sysCondID !== 0 && IPS_VariableExists($sysCondID)) ? GetValueFormatted($sysCondID) : '';
 
         $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
 
@@ -421,8 +421,13 @@ class TempestWeatherStation extends IPSModule
         foreach ($varList as $item) {
             if (!($item['Show'] ?? false)) continue;
 
-            $varID = @$this->GetIDForIdent($item['Ident']);
-            if (!$varID || !IPS_VariableExists($varID)) continue;
+            $varID = $this->GetIDForIdent($item['Ident']);
+            if ($varID === 0 || !IPS_VariableExists($varID)) {
+                if ($varID === 0) {
+                    $this->LogMessage("GenerateHTMLDashboard: Ident '" . $item['Ident'] . "' not found.", KL_WARNING);
+                }
+                continue;
+            }
 
             $formatted = GetValueFormatted($varID);
             $label = $item['Label'] ?? $item['Ident'] ?? 'Unknown';
@@ -431,7 +436,7 @@ class TempestWeatherStation extends IPSModule
             if ($item['ShowChart'] ?? false) {
                 if (AC_GetLoggingStatus($archiveID, $varID)) {
                     $history = AC_GetLoggedValues($archiveID, $varID, time() - ($chartTimeframe * 3600), time(), 0);
-                    if (count($history) > 1) {
+                    if (is_array($history) && count($history) > 1) {
                         $points = [];
                         foreach (array_reverse($history) as $row) {
                             $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($row['Value'], 2) . "]";
@@ -490,8 +495,11 @@ class TempestWeatherStation extends IPSModule
     private function HandleValueUpdate(string $ident, $value, int $timestamp, string $check)
     {
         if ($value === null) return;
-        $varID = @$this->GetIDForIdent($ident);
-        if (!$varID) return;
+        $varID = $this->GetIDForIdent($ident);
+        if ($varID === 0) {
+            $this->LogMessage("HandleValueUpdate: Variable Ident '" . $ident . "' not found.", KL_WARNING);
+            return;
+        }
 
         $type = IPS_GetVariable($varID)['VariableType'];
         switch ($type) {
@@ -602,8 +610,9 @@ class TempestWeatherStation extends IPSModule
 
     private function CheckTimestamp(string $ident, int $timestamp)
     {
-        $varID = @$this->GetIDForIdent($ident);
-        if (!$varID) return 'NEW_VALUE';
+        $varID = $this->GetIDForIdent($ident);
+        if ($varID === 0) return 'NEW_VALUE';
+
         $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
         if (!AC_GetLoggingStatus($archiveID, $varID)) return 'NEW_VALUE';
         if ($timestamp > time()) return 'INVALID';
