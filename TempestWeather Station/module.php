@@ -399,26 +399,30 @@ class TempestWeatherStation extends IPSModule
             $label = $item['Label'] ?? $item['Ident'] ?? 'Unknown';
             $chartHtml = "";
 
-            if (($item['ShowChart'] ?? false) && AC_GetLoggingStatus($archiveID, $varID)) {
-                $history = AC_GetLoggedValues($archiveID, $varID, time() - ($chartTimeframe * 3600), time(), 0);
-                if (count($history) > 1) {
-                    $points = [];
-                    foreach (array_reverse($history) as $row) {
-                        $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($row['Value'], 2) . "]";
-                    }
-                    $dataString = implode(',', $points);
-                    $chartID = "chart_" . $item['Ident'];
-                    $chartHtml = "<div id='$chartID' style='width: 100%; height: 30px; margin-top: 5px;'></div>";
+            if ($item['ShowChart'] ?? false) {
+                if (AC_GetLoggingStatus($archiveID, $varID)) {
+                    $history = AC_GetLoggedValues($archiveID, $varID, time() - ($chartTimeframe * 3600), time(), 0);
+                    if (count($history) > 1) {
+                        $points = [];
+                        foreach (array_reverse($history) as $row) {
+                            $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($row['Value'], 2) . "]";
+                        }
+                        $dataString = implode(',', $points);
+                        $chartID = "chart_" . $item['Ident'];
+                        $chartHtml = "<div id='$chartID' style='width: 100%; height: 30px; margin-top: 5px;'></div>";
 
-                    $chartScripts .= "
-                    Highcharts.chart('$chartID', {
-                        chart: { type: 'area', margin: [0, 0, 0, 0], backgroundColor: null, height: 30, skipClone: true },
-                        title: { text: null }, credits: { enabled: false }, legend: { enabled: false },
-                        xAxis: { visible: false, type: 'datetime' }, yAxis: { visible: false },
-                        tooltip: { enabled: true, headerFormat: '', pointFormat: '{point.x:%H:%M}: <b>{point.y}</b>', outside: true },
-                        plotOptions: { series: { marker: { enabled: false, states: { hover: { enabled: true } } }, lineWidth: 1, fillOpacity: 0.1, color: '$chartColor', animation: false } },
-                        series: [{ data: [$dataString] }]
-                    });";
+                        $chartScripts .= "
+                        Highcharts.chart('$chartID', {
+                            chart: { type: 'area', margin: [0, 0, 0, 0], backgroundColor: null, height: 30, skipClone: true },
+                            title: { text: null }, credits: { enabled: false }, legend: { enabled: false },
+                            xAxis: { visible: false, type: 'datetime' }, yAxis: { visible: false },
+                            tooltip: { enabled: true, headerFormat: '', pointFormat: '{point.x:%H:%M}: <b>{point.y}</b>', outside: true },
+                            plotOptions: { series: { marker: { enabled: false, states: { hover: { enabled: true } } }, lineWidth: 1, fillOpacity: 0.1, color: '$chartColor', animation: false } },
+                            series: [{ data: [$dataString] }]
+                        });";
+                    }
+                } else {
+                    $chartHtml = "<div style='font-size: 8px; opacity: 0.5; margin-top: 5px;'>(Logging Off)</div>";
                 }
             }
 
