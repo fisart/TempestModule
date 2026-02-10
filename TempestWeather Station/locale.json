@@ -3,10 +3,18 @@
         "en": {
             "Station Name": "Station Name",
             "Profile Prefix": "Profile Prefix",
+            "Authentication Mode": "Authentication Mode",
+            "None": "None",
+            "Manual": "Manual",
+            "Secrets Manager": "Secrets Manager",
+            "Webhook User": "Webhook User",
+            "Webhook Password": "Webhook Password",
             "Secrets Manager Instance ID": "Secrets Manager Instance ID",
+            "Archive Control": "Archive Control",
             "Enable Battery Hysteresis Logic": "Enable Battery Hysteresis Logic",
             "Trigger Value Slope (m)": "Trigger Value Slope (m)",
             "Number of Datapoints": "Number of Datapoints",
+            "⚠️ WARNING: Battery Analytics and Dashboard Charts require Archive Logging to be enabled for the respective variables.": "⚠️ WARNING: Battery Analytics and Dashboard Charts require Archive Logging to be enabled for the respective variables.",
             "Wind (Avg, Lull, Gust, Dir, Interval)": "Wind (Avg, Lull, Gust, Dir, Interval)",
             "Air (Temp, Humidity, Pressure)": "Air (Temp, Humidity, Pressure)",
             "Light (Illuminance, UV, Solar Radiation)": "Light (Illuminance, UV, Solar Radiation)",
@@ -28,15 +36,24 @@
             "Row": "Row",
             "Col": "Col",
             "💾 SAVE DASHBOARD SELECTION": "💾 SAVE DASHBOARD SELECTION",
-            "Update Profiles Now": "Update Profiles Now"
+            "Update Profiles Now": "Update Profiles Now",
+            "Initialize Required Archive Logging": "Initialize Required Archive Logging"
         },
         "de": {
             "Station Name": "Stationsname",
             "Profile Prefix": "Profil-Präfix",
+            "Authentication Mode": "Authentifizierungsmodus",
+            "None": "Keine",
+            "Manual": "Manuell",
+            "Secrets Manager": "Secrets Manager",
+            "Webhook User": "Webhook-Benutzer",
+            "Webhook Password": "Webhook-Passwort",
             "Secrets Manager Instance ID": "Secrets Manager Instanz-ID",
+            "Archive Control": "Archiv-Steuerung",
             "Enable Battery Hysteresis Logic": "Batterie-Hystereselogik aktivieren",
             "Trigger Value Slope (m)": "Schwellwert Steigung (m)",
             "Number of Datapoints": "Anzahl der Datenpunkte",
+            "⚠️ WARNING: Battery Analytics and Dashboard Charts require Archive Logging to be enabled for the respective variables.": "⚠️ WARNUNG: Batterie-Analysen und Dashboard-Diagramme erfordern die Aktivierung des Archiv-Loggings für die jeweiligen Variablen.",
             "Wind (Avg, Lull, Gust, Dir, Interval)": "Wind (Schnitt, Ruhe, Böen, Richt., Intervall)",
             "Air (Temp, Humidity, Pressure)": "Luft (Temp, Feuchte, Druck)",
             "Light (Illuminance, UV, Solar Radiation)": "Licht (Helligkeit, UV, Strahlung)",
@@ -58,7 +75,8 @@
             "Row": "Zeile",
             "Col": "Spalte",
             "💾 SAVE DASHBOARD SELECTION": "💾 DASHBOARD-AUSWAHL SPEICHERN",
-            "Update Profiles Now": "Profile jetzt aktualisieren"
+            "Update Profiles Now": "Profile jetzt aktualisieren",
+            "Initialize Required Archive Logging": "Erforderliches Archiv-Logging initialisieren"
         }
     }
 }
