@@ -28,6 +28,10 @@ class TempestWeatherStation extends IPSModule
         $this->RegisterPropertyString('TriggerValueSlope', '0.000004');
         $this->RegisterPropertyInteger('RegressionDataPoints', 45);
 
+        $this->RegisterPropertyInteger('AuthMode', 0);
+$this->RegisterPropertyString('WebhookUser', '');
+$this->RegisterPropertyString('WebhookPassword', '');
+
         // Visualization & Dashboard
         $this->RegisterPropertyBoolean('EnableHTML', true);
         $this->RegisterPropertyInteger('HTMLUpdateInterval', 0);
@@ -78,6 +82,8 @@ class TempestWeatherStation extends IPSModule
 
         $this->UpdateProfiles();
 
+        $this->UpdateUI();
+        
         // Register for Kernel Started message
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
 
@@ -129,7 +135,7 @@ class TempestWeatherStation extends IPSModule
     /**
      * This function is called by the Webhook Bot
      */
-    protected function ProcessHookData()
+protected function ProcessHookData()
     {
         // 1. Web App Manifest Handler
         if (isset($_GET['manifest'])) {
@@ -152,6 +158,66 @@ class TempestWeatherStation extends IPSModule
             ]);
             return;
         }
+
+        // 2. Authentication Validation
+        $authMode = $this->ReadPropertyInteger('AuthMode');
+        $validUser = '';
+        $validPass = '';
+
+        if ($authMode === 1) { // Manual
+            $validUser = $this->ReadPropertyString('WebhookUser');
+            $validPass = $this->ReadPropertyString('WebhookPassword');
+        } elseif ($authMode === 2) { // Secrets Manager
+            $secretsID = $this->ReadPropertyInteger('SecretsInstanceID');
+            if ($secretsID > 0 && IPS_InstanceExists($secretsID)) {
+                $access_data = json_decode(SEC_GetSecret($secretsID, 'Webhooks'), true);
+                $validUser = $access_data['Tempest']['User'] ?? '';
+                $validPass = $access_data['Tempest']['PW'] ?? '';
+            }
+        }
+
+        if ($authMode > 0) {
+            if (!isset($_SERVER['PHP_AUTH_USER'])) $_SERVER['PHP_AUTH_USER'] = "";
+            if (!isset($_SERVER['PHP_AUTH_PW'])) $_SERVER['PHP_AUTH_PW'] = "";
+
+            if (($_SERVER['PHP_AUTH_USER'] !== $validUser) || ($_SERVER['PHP_AUTH_PW'] !== $validPass)) {
+                header('WWW-Authenticate: Basic Realm="Tempest Dashboard"');
+                header('HTTP/1.0 401 Unauthorized');
+                echo "Authorization required";
+                return;
+            }
+        }
+
+        // 3. Render Dashboard with Standalone App wrapper
+        $dashboardHTML = $this->GetValue('Dashboard');
+        $bgColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLBackgroundColor'));
+        $title = $this->ReadPropertyString('StationName');
+
+        echo "<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
+    <title>$title</title>
+    <link rel='manifest' href='?manifest=1'>
+    <link rel='apple-touch-icon' href='https://weatherflow.github.io/Tempest/img/tempest-icon-192.png'>
+    <meta name='theme-color' content='$bgColor'>
+    <meta name='apple-mobile-web-app-capable' content='yes'>
+    <meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'>
+    <meta name='mobile-web-app-capable' content='yes'>
+    <meta name='apple-mobile-web-app-title' content='Tempest'>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background-color: $bgColor; }
+        #container { width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+    <div id='container'>
+        $dashboardHTML
+    </div>
+</body>
+</html>";
+    }
 
         // 2. Basic Auth Validation via Secrets Manager
         $secretsID = $this->ReadPropertyInteger('SecretsInstanceID');
@@ -869,11 +935,27 @@ class TempestWeatherStation extends IPSModule
         return $master;
     }
 
-    public function GetConfigurationForm()
+public function GetConfigurationForm()
     {
         $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
-        $master = $this->GetMasterMetadata();
+        
+        // --- Auth Visibility Logic ---
+        $authMode = $this->ReadPropertyInteger('AuthMode');
+        foreach ($form['elements'] as &$panel) {
+            if (isset($panel['caption']) && $panel['caption'] == 'General Settings') {
+                foreach ($panel['items'] as &$item) {
+                    if (in_array($item['name'], ['WebhookUser', 'WebhookPassword'])) {
+                        $item['visible'] = ($authMode === 1);
+                    }
+                    if ($item['name'] == 'SecretsInstanceID') {
+                        $item['visible'] = ($authMode === 2);
+                    }
+                }
+            }
+        }
 
+        // --- Dashboard Grid Logic (Existing) ---
+        $master = $this->GetMasterMetadata();
         $bufferData = $this->ReadAttributeString('HTMLVariableListBuffer');
         $values = json_decode($bufferData, true) ?: [];
 
@@ -882,24 +964,18 @@ class TempestWeatherStation extends IPSModule
         }
 
         $existingIdents = array_column($values, 'Ident');
-
         foreach ($values as &$val) {
             if (isset($val['Ident']) && isset($master[$val['Ident']])) {
                 $val['Label'] = $master[$val['Ident']];
             }
         }
 
-        // Fix: Auto-distribute new variables to prevent stacking on Row 1, Col 1
-        $r = 1;
-        $c = 1;
+        $r = 1; $c = 1;
         foreach ($master as $ident => $label) {
             if (!in_array($ident, $existingIdents)) {
                 $values[] = ['Label' => $label, 'Show' => false, 'ShowChart' => false, 'Row' => $r, 'Col' => $c, 'Ident' => $ident];
                 $c++;
-                if ($c > 4) {
-                    $c = 1;
-                    $r++;
-                }
+                if ($c > 4) { $c = 1; $r++; }
             }
         }
 
@@ -913,7 +989,6 @@ class TempestWeatherStation extends IPSModule
                             $listComponent = $item;
                             $listComponent['values'] = $values;
                             $listComponent['onEdit'] = "TMT_UpdateDashboardRow(\$id, json_encode(\$HTMLVariableList));";
-
                             $form['actions'][] = $listComponent;
                             unset($form['elements'][$k]['items'][$i]);
                         }
@@ -924,6 +999,19 @@ class TempestWeatherStation extends IPSModule
         }
 
         return json_encode($form);
+    }
+
+    public function UpdateUI()
+    {
+        $authMode = $this->ReadPropertyInteger('AuthMode');
+        
+        // Toggle visibility based on selected mode
+        // Mode 1 = Manual
+        $this->UpdateFormField('WebhookUser', 'visible', ($authMode === 1));
+        $this->UpdateFormField('WebhookPassword', 'visible', ($authMode === 1));
+        
+        // Mode 2 = Secrets Manager
+        $this->UpdateFormField('SecretsInstanceID', 'visible', ($authMode === 2));
     }
 
     public function UpdateDashboardRow(string $HTMLVariableList)

@@ -1,9 +1,16 @@
 {
     "elements": [
         { "type": "ExpansionPanel", "caption": "General Settings", "items": [
+            { "type": "Select", "name": "AuthMode", "caption": "Authentication Mode", "options": [
+                { "caption": "None", "value": 0 },
+                { "caption": "Manual", "value": 1 },
+                { "caption": "Secrets Manager", "value": 2 }
+            ], "onChange": "TMT_UpdateUI($id);" },
+            { "type": "ValidationTextBox", "name": "WebhookUser", "caption": "Webhook User", "visible": false },
+            { "type": "PasswordTextBox", "name": "WebhookPassword", "caption": "Webhook Password", "visible": false },
+            { "type": "NumberSpinner", "name": "SecretsInstanceID", "caption": "Secrets Manager Instance ID", "visible": false },
             { "type": "ValidationTextBox", "name": "StationName", "caption": "Station Name" },
             { "type": "ValidationTextBox", "name": "ProfilePrefix", "caption": "Profile Prefix" },
-            { "type": "NumberSpinner", "name": "SecretsInstanceID", "caption": "Secrets Manager Instance ID" },
             { "type": "SelectInstance", "name": "ArchiveID", "caption": "Archive Control", "moduleID": "{43192F0B-135B-4CE7-A0A7-1475603F3060}" }
         ]},
         { "type": "ExpansionPanel", "caption": "Battery Regression (Experimental)", "items": [
