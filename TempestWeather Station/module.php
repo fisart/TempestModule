@@ -611,7 +611,9 @@ class TempestWeatherStation extends IPSModule
     private function CheckTimestamp(string $ident, int $timestamp)
     {
         $varID = @$this->GetIDForIdent($ident);
-        if ($varID === 0) return 'NEW_VALUE';
+        if ($varID === false || $varID === 0 || !IPS_VariableExists($varID)) {
+            return 'NEW_VALUE';
+        }
 
         $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
         if (!AC_GetLoggingStatus($archiveID, $varID)) return 'NEW_VALUE';
