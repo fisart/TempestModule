@@ -251,6 +251,9 @@ class TempestWeatherStation extends IPSModule
 
         $config = $this->GetModuleConfig();
         $prefix = $this->ReadPropertyString('ProfilePrefix');
+        if ($prefix !== '' && substr($prefix, -1) !== '.' && substr($prefix, -1) !== '_') {
+            $prefix .= '.';
+        }
 
         foreach ($config['descriptions']['obs_st'] as $index => $name) {
             if ($index == 19) continue; // Skip Rohdaten
@@ -292,7 +295,6 @@ class TempestWeatherStation extends IPSModule
         }
     }
 
-
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
     {
         switch ($Message) {
@@ -304,34 +306,35 @@ class TempestWeatherStation extends IPSModule
     }
 
     public function EnableLogging()
-    { {
-            $archiveID = $this->ReadPropertyInteger('ArchiveID');
-            if ($archiveID === 0 || !IPS_InstanceExists($archiveID)) {
-                echo "Error: Please select an Archive Control in the settings first.";
-                return;
-            }
+    {
+        $archiveID = $this->ReadPropertyInteger('ArchiveID');
+        if ($archiveID === 0 || !IPS_InstanceExists($archiveID)) {
+            echo "Error: Please select an Archive Control in the settings first.";
+            return;
+        }
 
-            // 1. Enable for Battery (required for Regression)
-            $batteryID = @$this->GetIDForIdent('Battery');
-            if ($batteryID) {
-                AC_SetLoggingStatus($archiveID, $batteryID, true);
-            }
+        // 1. Enable for Battery (required for Regression)
+        $batteryID = @$this->GetIDForIdent('Battery');
+        if ($batteryID) {
+            AC_SetLoggingStatus($archiveID, $batteryID, true);
+        }
 
-            // 2. Enable for Chart variables
-            $varList = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
-            foreach ($varList as $item) {
-                if ($item['ShowChart'] ?? false) {
-                    $varID = @$this->GetIDForIdent($item['Ident']);
-                    if ($varID) {
-                        AC_SetLoggingStatus($archiveID, $varID, true);
-                    }
+        // 2. Enable for Chart variables
+        $varList = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
+        foreach ($varList as $item) {
+            if ($item['ShowChart'] ?? false) {
+                $varID = @$this->GetIDForIdent($item['Ident']);
+                if ($varID) {
+                    AC_SetLoggingStatus($archiveID, $varID, true);
                 }
             }
-
-            IPS_ApplyChanges($archiveID);
-            echo "Archive logging has been enabled for the Battery and all selected Chart variables.";
         }
+
+        IPS_ApplyChanges($archiveID);
+        echo "Archive logging has been enabled for the Battery and all selected Chart variables.";
     }
+
+
     private function UpdateBatteryLogic(float $currentVoltage)
     {
         $archiveID = $this->ReadPropertyInteger('ArchiveID');
@@ -339,9 +342,13 @@ class TempestWeatherStation extends IPSModule
             $this->LogMessage("UpdateBatteryLogic: Archive Control not configured.", KL_WARNING);
             return;
         }
+
         $nrPoints = $this->ReadPropertyInteger('RegressionDataPoints');
         $triggerSlope = (float)$this->ReadPropertyString('TriggerValueSlope');
         $prefix = $this->ReadPropertyString('ProfilePrefix');
+        if ($prefix !== '' && substr($prefix, -1) !== '.' && substr($prefix, -1) !== '_') {
+            $prefix .= '.';
+        }
 
         $batteryID = @$this->GetIDForIdent('Battery');
         if ($batteryID === 0) {
@@ -546,6 +553,9 @@ class TempestWeatherStation extends IPSModule
 
         $config = $this->GetModuleConfig();
         $prefix = $this->ReadPropertyString('ProfilePrefix');
+        if ($prefix !== '' && substr($prefix, -1) !== '.' && substr($prefix, -1) !== '_') {
+            $prefix .= '.';
+        }
 
         foreach ($config['descriptions']['device_status'] as $index => $name) {
             if (!isset($data[$name]) || is_array($data[$name])) continue;
@@ -569,6 +579,9 @@ class TempestWeatherStation extends IPSModule
 
         $config = $this->GetModuleConfig();
         $prefix = $this->ReadPropertyString('ProfilePrefix');
+        if ($prefix !== '' && substr($prefix, -1) !== '.' && substr($prefix, -1) !== '_') {
+            $prefix .= '.';
+        }
 
         foreach ($config['descriptions']['hub_status'] as $index => $name) {
             if ($name === null || !isset($data[$name])) continue;
@@ -596,6 +609,9 @@ class TempestWeatherStation extends IPSModule
         $timestamp = $data['ob'][0];
         if ($this->CheckTimestamp('Time_Epoch_Wind', $timestamp) === 'INVALID') return;
         $prefix = $this->ReadPropertyString('ProfilePrefix');
+        if ($prefix !== '' && substr($prefix, -1) !== '.' && substr($prefix, -1) !== '_') {
+            $prefix .= '.';
+        }
 
         $this->MaintainVariable('Wind_Speed', 'Wind Speed', 2, $prefix . 'km_pro_stunde', 10, true);
         $this->HandleValueUpdate('Wind_Speed', $data['ob'][1] * 3.6, $timestamp, 'NEW_VALUE');
@@ -607,7 +623,12 @@ class TempestWeatherStation extends IPSModule
     private function ProcessPrecip(array $data)
     {
         $timestamp = $data['evt'][0];
-        $this->MaintainVariable('Rain_Start_Event', 'Rain Start Event', 1, $this->ReadPropertyString('ProfilePrefix') . 'UnixTimestamp', 120, true);
+        $prefix = $this->ReadPropertyString('ProfilePrefix');
+        if ($prefix !== '' && substr($prefix, -1) !== '.' && substr($prefix, -1) !== '_') {
+            $prefix .= '.';
+        }
+
+        $this->MaintainVariable('Rain_Start_Event', 'Rain Start Event', 1, $prefix . 'UnixTimestamp', 120, true);
         $this->HandleValueUpdate('Rain_Start_Event', $timestamp, $timestamp, 'NEW_VALUE');
     }
 
@@ -615,6 +636,10 @@ class TempestWeatherStation extends IPSModule
     {
         $timestamp = $data['evt'][0];
         $prefix = $this->ReadPropertyString('ProfilePrefix');
+        if ($prefix !== '' && substr($prefix, -1) !== '.' && substr($prefix, -1) !== '_') {
+            $prefix .= '.';
+        }
+
         $this->MaintainVariable('Strike_Distance', 'Distance', 2, $prefix . 'km', 130, true);
         $this->HandleValueUpdate('Strike_Distance', $data['evt'][1], $timestamp, 'NEW_VALUE');
         $this->MaintainVariable('Strike_Energy', 'Energy', 1, $prefix . 'energy', 131, true);
@@ -643,6 +668,10 @@ class TempestWeatherStation extends IPSModule
     public function UpdateProfiles()
     {
         $prefix = $this->ReadPropertyString('ProfilePrefix');
+        if ($prefix !== '' && substr($prefix, -1) !== '.' && substr($prefix, -1) !== '_') {
+            $prefix .= '.';
+        }
+
         $config = $this->GetModuleConfig();
         foreach ($config['profiles'] as $name => $p) {
             $this->RegisterProfile($prefix . $name, $p['type'], $p['digits'], $p['prefix'], $p['suffix'], $p['min'], $p['max'], $p['step'], $p['associations'] ?? null);
