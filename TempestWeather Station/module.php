@@ -940,7 +940,7 @@ class TempestWeatherStation extends IPSModule
     {
         $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
 
-        // --- Auth Visibility Logic ---
+        // 1. Handle Visibility in General Settings
         $authMode = $this->ReadPropertyInteger('AuthMode');
         foreach ($form['elements'] as &$panel) {
             if (isset($panel['caption']) && $panel['caption'] == 'General Settings') {
@@ -954,8 +954,9 @@ class TempestWeatherStation extends IPSModule
                 }
             }
         }
+        unset($panel); // CRITICAL: Destroy reference to prevent corruption of subsequent loops
 
-        // --- Dashboard Grid Logic (Existing) ---
+        // 2. Prepare Dashboard Grid Data
         $master = $this->GetMasterMetadata();
         $bufferData = $this->ReadAttributeString('HTMLVariableListBuffer');
         $values = json_decode($bufferData, true) ?: [];
@@ -986,6 +987,7 @@ class TempestWeatherStation extends IPSModule
 
         $this->WriteAttributeString('HTMLVariableListBuffer', json_encode($values));
 
+        // 3. Move List to Actions while keeping other Panel items
         foreach ($form['elements'] as $k => $panel) {
             if (isset($panel['caption']) && $panel['caption'] == 'Dashboard Customization') {
                 if (isset($panel['items']) && is_array($panel['items'])) {
@@ -998,6 +1000,7 @@ class TempestWeatherStation extends IPSModule
                             unset($form['elements'][$k]['items'][$i]);
                         }
                     }
+                    // Re-index items to ensure the panel remains valid for the remaining properties
                     $form['elements'][$k]['items'] = array_values($form['elements'][$k]['items']);
                 }
             }
