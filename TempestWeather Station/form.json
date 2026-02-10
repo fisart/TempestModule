@@ -3,7 +3,8 @@
         { "type": "ExpansionPanel", "caption": "General Settings", "items": [
             { "type": "ValidationTextBox", "name": "StationName", "caption": "Station Name" },
             { "type": "ValidationTextBox", "name": "ProfilePrefix", "caption": "Profile Prefix" },
-            { "type": "NumberSpinner", "name": "SecretsInstanceID", "caption": "Secrets Manager Instance ID" }
+            { "type": "NumberSpinner", "name": "SecretsInstanceID", "caption": "Secrets Manager Instance ID" },
+            { "type": "SelectInstance", "name": "ArchiveID", "caption": "Archive Control", "moduleID": "{43192F0B-135B-4CE7-A0A7-1475603F3060}" }
         ]},
         { "type": "ExpansionPanel", "caption": "Battery Regression (Experimental)", "items": [
             { "type": "CheckBox", "name": "ExperimentalRegression", "caption": "Enable Battery Hysteresis Logic" },

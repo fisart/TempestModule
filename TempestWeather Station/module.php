@@ -21,6 +21,7 @@ class TempestWeatherStation extends IPSModule
         $this->RegisterPropertyString('StationName', 'Tempest Station Status');
         $this->RegisterPropertyString('ProfilePrefix', 'Tempest_');
         $this->RegisterPropertyInteger('SecretsInstanceID', 0);
+        $this->RegisterPropertyInteger('ArchiveID', 0);
 
         // Battery Regression
         $this->RegisterPropertyBoolean('ExperimentalRegression', true);
@@ -304,7 +305,12 @@ class TempestWeatherStation extends IPSModule
 
     public function EnableLogging()
     {
-        $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
+            {
+        $archiveID = $this->ReadPropertyInteger('ArchiveID');
+        if ($archiveID === 0 || !IPS_InstanceExists($archiveID)) {
+            echo "Error: Please select an Archive Control in the settings first.";
+            return;
+        }
 
         // 1. Enable for Battery (required for Regression)
         $batteryID = @$this->GetIDForIdent('Battery');
@@ -328,7 +334,11 @@ class TempestWeatherStation extends IPSModule
     }
     private function UpdateBatteryLogic(float $currentVoltage)
     {
-        $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
+        $archiveID = $this->ReadPropertyInteger('ArchiveID');
+        if ($archiveID === 0 || !IPS_InstanceExists($archiveID)) {
+            $this->LogMessage("UpdateBatteryLogic: Archive Control not configured.", KL_WARNING);
+            return;
+        }
         $nrPoints = $this->ReadPropertyInteger('RegressionDataPoints');
         $triggerSlope = (float)$this->ReadPropertyString('TriggerValueSlope');
         $prefix = $this->ReadPropertyString('ProfilePrefix');
@@ -413,7 +423,8 @@ class TempestWeatherStation extends IPSModule
         $sysCondID = $this->GetIDForIdent('System_Condition');
         $sysCondStr = ($sysCondID !== 0 && IPS_VariableExists($sysCondID)) ? GetValueFormatted($sysCondID) : '';
 
-        $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
+        $archiveID = $this->ReadPropertyInteger('ArchiveID');
+        $archiveReady = ($archiveID > 0 && IPS_InstanceExists($archiveID));
 
         $itemsHtml = "";
         $chartScripts = "";
@@ -433,7 +444,7 @@ class TempestWeatherStation extends IPSModule
             $label = $item['Label'] ?? $item['Ident'] ?? 'Unknown';
             $chartHtml = "";
 
-            if ($item['ShowChart'] ?? false) {
+            if (($item['ShowChart'] ?? false) && $archiveReady) {
                 if (AC_GetLoggingStatus($archiveID, $varID)) {
                     $history = AC_GetLoggedValues($archiveID, $varID, time() - ($chartTimeframe * 3600), time(), 0);
                     if (is_array($history) && count($history) > 1) {
@@ -492,7 +503,7 @@ class TempestWeatherStation extends IPSModule
         $this->SetValue('Dashboard', $html);
     }
 
-    private function HandleValueUpdate(string $ident, $value, int $timestamp, string $check)
+private function HandleValueUpdate(string $ident, $value, int $timestamp, string $check)
     {
         if ($value === null) return;
         $varID = @$this->GetIDForIdent($ident);
@@ -518,9 +529,11 @@ class TempestWeatherStation extends IPSModule
         }
 
         if ($check === 'OLD_TIME_STAMP') {
-            $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
-            AC_AddLoggedValues($archiveID, $varID, [['TimeStamp' => $timestamp, 'Value' => $value]]);
-            AC_ReAggregateVariable($archiveID, $varID);
+            $archiveID = $this->ReadPropertyInteger('ArchiveID');
+            if ($archiveID > 0 && IPS_InstanceExists($archiveID)) {
+                AC_AddLoggedValues($archiveID, $varID, [['TimeStamp' => $timestamp, 'Value' => $value]]);
+                AC_ReAggregateVariable($archiveID, $varID);
+            }
         } else {
             SetValue($varID, $value);
         }
@@ -608,20 +621,22 @@ class TempestWeatherStation extends IPSModule
         $this->HandleValueUpdate('Strike_Energy', $data['evt'][2], $timestamp, 'NEW_VALUE');
     }
 
-    private function CheckTimestamp(string $ident, int $timestamp)
+private function CheckTimestamp(string $ident, int $timestamp)
     {
         $varID = @$this->GetIDForIdent($ident);
         if ($varID === false || $varID === 0 || !IPS_VariableExists($varID)) {
             return 'NEW_VALUE';
         }
-
-        $archiveID = IPS_GetInstanceListByModuleID('{43192F0B-135B-4CE7-A0A7-1475603F3060}')[0];
+        
+        $archiveID = $this->ReadPropertyInteger('ArchiveID');
+        if ($archiveID === 0 || !IPS_InstanceExists($archiveID)) return 'NEW_VALUE';
+        
         if (!AC_GetLoggingStatus($archiveID, $varID)) return 'NEW_VALUE';
         if ($timestamp > time()) return 'INVALID';
-
+        
         $lastValues = AC_GetLoggedValues($archiveID, $varID, $timestamp - 1, $timestamp + 1, 1);
         if (!empty($lastValues) && $lastValues[0]['Value'] == $timestamp) return 'INVALID';
-
+        
         return ($timestamp < IPS_GetVariable($varID)['VariableUpdated']) ? 'OLD_TIME_STAMP' : 'NEW_VALUE';
     }
 
