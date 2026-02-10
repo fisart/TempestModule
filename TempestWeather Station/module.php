@@ -304,33 +304,33 @@ class TempestWeatherStation extends IPSModule
     }
 
     public function EnableLogging()
-    {
-            {
-        $archiveID = $this->ReadPropertyInteger('ArchiveID');
-        if ($archiveID === 0 || !IPS_InstanceExists($archiveID)) {
-            echo "Error: Please select an Archive Control in the settings first.";
-            return;
-        }
+    { {
+            $archiveID = $this->ReadPropertyInteger('ArchiveID');
+            if ($archiveID === 0 || !IPS_InstanceExists($archiveID)) {
+                echo "Error: Please select an Archive Control in the settings first.";
+                return;
+            }
 
-        // 1. Enable for Battery (required for Regression)
-        $batteryID = @$this->GetIDForIdent('Battery');
-        if ($batteryID) {
-            AC_SetLoggingStatus($archiveID, $batteryID, true);
-        }
+            // 1. Enable for Battery (required for Regression)
+            $batteryID = @$this->GetIDForIdent('Battery');
+            if ($batteryID) {
+                AC_SetLoggingStatus($archiveID, $batteryID, true);
+            }
 
-        // 2. Enable for Chart variables
-        $varList = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
-        foreach ($varList as $item) {
-            if ($item['ShowChart'] ?? false) {
-                $varID = @$this->GetIDForIdent($item['Ident']);
-                if ($varID) {
-                    AC_SetLoggingStatus($archiveID, $varID, true);
+            // 2. Enable for Chart variables
+            $varList = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
+            foreach ($varList as $item) {
+                if ($item['ShowChart'] ?? false) {
+                    $varID = @$this->GetIDForIdent($item['Ident']);
+                    if ($varID) {
+                        AC_SetLoggingStatus($archiveID, $varID, true);
+                    }
                 }
             }
-        }
 
-        IPS_ApplyChanges($archiveID);
-        echo "Archive logging has been enabled for the Battery and all selected Chart variables.";
+            IPS_ApplyChanges($archiveID);
+            echo "Archive logging has been enabled for the Battery and all selected Chart variables.";
+        }
     }
     private function UpdateBatteryLogic(float $currentVoltage)
     {
@@ -503,7 +503,7 @@ class TempestWeatherStation extends IPSModule
         $this->SetValue('Dashboard', $html);
     }
 
-private function HandleValueUpdate(string $ident, $value, int $timestamp, string $check)
+    private function HandleValueUpdate(string $ident, $value, int $timestamp, string $check)
     {
         if ($value === null) return;
         $varID = @$this->GetIDForIdent($ident);
@@ -621,22 +621,22 @@ private function HandleValueUpdate(string $ident, $value, int $timestamp, string
         $this->HandleValueUpdate('Strike_Energy', $data['evt'][2], $timestamp, 'NEW_VALUE');
     }
 
-private function CheckTimestamp(string $ident, int $timestamp)
+    private function CheckTimestamp(string $ident, int $timestamp)
     {
         $varID = @$this->GetIDForIdent($ident);
         if ($varID === false || $varID === 0 || !IPS_VariableExists($varID)) {
             return 'NEW_VALUE';
         }
-        
+
         $archiveID = $this->ReadPropertyInteger('ArchiveID');
         if ($archiveID === 0 || !IPS_InstanceExists($archiveID)) return 'NEW_VALUE';
-        
+
         if (!AC_GetLoggingStatus($archiveID, $varID)) return 'NEW_VALUE';
         if ($timestamp > time()) return 'INVALID';
-        
+
         $lastValues = AC_GetLoggedValues($archiveID, $varID, $timestamp - 1, $timestamp + 1, 1);
         if (!empty($lastValues) && $lastValues[0]['Value'] == $timestamp) return 'INVALID';
-        
+
         return ($timestamp < IPS_GetVariable($varID)['VariableUpdated']) ? 'OLD_TIME_STAMP' : 'NEW_VALUE';
     }
 
