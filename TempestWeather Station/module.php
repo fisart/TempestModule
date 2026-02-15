@@ -491,10 +491,10 @@ class TempestWeatherStation extends IPSModule
         $chartTimeframe = $this->ReadPropertyInteger('ChartTimeframe');
         $chartColor = sprintf("#%06X", $this->ReadPropertyInteger('ChartColor'));
 
-        $timeID = $this->GetIDForIdent('Time_Epoch');
+        $timeID = @$this->GetIDForIdent('Time_Epoch');
         $timeStr = ($timeID !== 0 && IPS_VariableExists($timeID)) ? date('H:i:s', GetValue($timeID)) : '--:--:--';
 
-        $sysCondID = $this->GetIDForIdent('System_Condition');
+        $sysCondID = @$this->GetIDForIdent('System_Condition');
         $sysCondStr = ($sysCondID !== 0 && IPS_VariableExists($sysCondID)) ? GetValueFormatted($sysCondID) : '';
 
         $archiveID = $this->ReadPropertyInteger('ArchiveID');
@@ -506,11 +506,24 @@ class TempestWeatherStation extends IPSModule
         foreach ($varList as $item) {
             if (!isset($item['Ident']) || !($item['Show'] ?? false)) continue;
 
-            $varID = $this->GetIDForIdent($item['Ident']);
-            if ($varID === 0 || !IPS_VariableExists($varID)) {
-                if ($varID === 0) {
-                    $this->LogMessage("GenerateHTMLDashboard: Ident '" . $item['Ident'] . "' not found.", KL_WARNING);
+            // Fix: Recursive search for the Ident to support variables inside sub-categories
+            $varID = @IPS_GetObjectIDByIdent($item['Ident'], $this->InstanceID);
+
+            // If not found directly, check sub-folders (Categories)
+            if ($varID === 0) {
+                $children = IPS_GetChildrenIDs($this->InstanceID);
+                foreach ($children as $child) {
+                    if (IPS_GetObject($child)['ObjectType'] === 0) { // Category
+                        $subID = @IPS_GetObjectIDByIdent($item['Ident'], $child);
+                        if ($subID !== 0) {
+                            $varID = $subID;
+                            break;
+                        }
+                    }
                 }
+            }
+
+            if ($varID === 0 || !IPS_VariableExists($varID)) {
                 continue;
             }
 
@@ -563,7 +576,7 @@ class TempestWeatherStation extends IPSModule
                 $stationName <span style='font-size: 0.6em; opacity: 0.6; margin-left: 2cqi;'>($timeStr)</span>
                 <div style='font-size: 0.4em; opacity: 0.8; font-weight: normal; margin-top: 0.5cqi;'>$sysCondStr</div>
             </div>
-            <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1cqi; flex-grow: 1; margin-top: 1.5cqi;'>
+            <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1.5cqi; flex-grow: 1; margin-top: 2cqi;'>
                 $itemsHtml
             </div>
             <script>
