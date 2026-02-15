@@ -505,7 +505,7 @@ class TempestWeatherStation extends IPSModule
 
         foreach ($varList as $item) {
             if (!($item['Show'] ?? false)) continue;
-
+            $this->LogMessage("Dashboard Loop Item: " . json_encode($item), KL_MESSAGE);
             $varID = $this->GetIDForIdent($item['Ident']);
             if ($varID === 0 || !IPS_VariableExists($varID)) {
                 if ($varID === 0) {
