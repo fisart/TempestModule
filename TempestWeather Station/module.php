@@ -954,7 +954,7 @@ class TempestWeatherStation extends IPSModule
                 }
             }
         }
-        unset($panel); // CRITICAL: Destroy reference to prevent corruption of subsequent loops
+        unset($panel);
 
         // 2. Prepare Dashboard Grid Data
         $master = $this->GetMasterMetadata();
@@ -964,6 +964,11 @@ class TempestWeatherStation extends IPSModule
         if (empty($values)) {
             $values = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
         }
+
+        // Fix: Structural cleanup - Remove entries without an Ident to "drain the swamp" of bad data
+        $values = array_values(array_filter($values, function ($v) {
+            return isset($v['Ident']) && !empty($v['Ident']);
+        }));
 
         $existingIdents = array_column($values, 'Ident');
         foreach ($values as &$val) {
@@ -1000,7 +1005,6 @@ class TempestWeatherStation extends IPSModule
                             unset($form['elements'][$k]['items'][$i]);
                         }
                     }
-                    // Re-index items to ensure the panel remains valid for the remaining properties
                     $form['elements'][$k]['items'] = array_values($form['elements'][$k]['items']);
                 }
             }
@@ -1035,11 +1039,14 @@ class TempestWeatherStation extends IPSModule
 
         $map = [];
         foreach ($buffer as $item) {
-            if (isset($item['Ident'])) $map[$item['Ident']] = $item;
+            // Fix: Only transfer entries with a valid Ident to the map; this purges bad data from the buffer
+            if (isset($item['Ident']) && !empty($item['Ident'])) {
+                $map[$item['Ident']] = $item;
+            }
         }
 
         foreach ($newData as $row) {
-            if (isset($row['Ident'])) {
+            if (isset($row['Ident']) && !empty($row['Ident'])) {
                 $row['Row'] = (int)$row['Row'];
                 $row['Col'] = (int)$row['Col'];
                 $row['Show'] = (bool)$row['Show'];
@@ -1049,7 +1056,7 @@ class TempestWeatherStation extends IPSModule
         }
 
         $this->WriteAttributeString('HTMLVariableListBuffer', json_encode(array_values($map)));
-        $this->SendDebug('UI-Update', 'RAM-Cache updated and types cast.', 0);
+        $this->SendDebug('UI-Update', 'RAM-Cache updated; malformed entries purged.', 0);
     }
 
     public function SaveSelections()
