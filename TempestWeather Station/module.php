@@ -82,6 +82,19 @@ class TempestWeatherStation extends IPSModule
 
         $this->UpdateProfiles();
 
+        // Blueprint Strategy 2.0 - Schritt 4: Label-Heilung / Persistence Guard
+        // Fixes corruption caused by the browser omitting readOnly columns during standard "Apply"
+        $buffer = $this->ReadAttributeString('HTMLVariableListBuffer');
+        $property = $this->ReadPropertyString('HTMLVariableList');
+        $propArr = json_decode($property, true);
+
+        // If the Property is corrupted (missing Idents) but the RAM-Cache is healthy, restore it
+        if (isset($propArr[0]) && !isset($propArr[0]['Ident']) && $buffer !== '[]' && $buffer !== '') {
+            IPS_SetProperty($this->InstanceID, 'HTMLVariableList', $buffer);
+            IPS_ApplyChanges($this->InstanceID);
+            return;
+        }
+
         $this->UpdateUI();
 
         // Register for Kernel Started message
