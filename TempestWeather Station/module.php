@@ -504,7 +504,7 @@ class TempestWeatherStation extends IPSModule
         $chartScripts = "";
 
         foreach ($varList as $item) {
-            if (!($item['Show'] ?? false)) continue;
+            if (!isset($item['Ident']) || !($item['Show'] ?? false)) continue;
 
             $varID = $this->GetIDForIdent($item['Ident']);
             if ($varID === 0 || !IPS_VariableExists($varID)) {
