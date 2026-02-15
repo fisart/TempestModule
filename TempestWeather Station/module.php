@@ -176,71 +176,32 @@ class TempestWeatherStation extends IPSModule
         $authMode = $this->ReadPropertyInteger('AuthMode');
         $validUser = '';
         $validPass = '';
+        $secretsID = $this->ReadPropertyInteger('SecretsInstanceID');
 
         if ($authMode === 1) { // Manual
             $validUser = $this->ReadPropertyString('WebhookUser');
             $validPass = $this->ReadPropertyString('WebhookPassword');
-        } elseif ($authMode === 2) { // Secrets Manager
-            $secretsID = $this->ReadPropertyInteger('SecretsInstanceID');
+        } elseif ($authMode === 2) { // Secrets Manager (User/PW)
             if ($secretsID > 0 && IPS_InstanceExists($secretsID)) {
                 $access_data = json_decode(SEC_GetSecret($secretsID, 'Webhooks'), true);
                 $validUser = $access_data['Tempest']['User'] ?? '';
                 $validPass = $access_data['Tempest']['PW'] ?? '';
             }
-        }
-
-        if ($authMode > 0) {
-            if (!isset($_SERVER['PHP_AUTH_USER'])) $_SERVER['PHP_AUTH_USER'] = "";
-            if (!isset($_SERVER['PHP_AUTH_PW'])) $_SERVER['PHP_AUTH_PW'] = "";
-
-            if (($_SERVER['PHP_AUTH_USER'] !== $validUser) || ($_SERVER['PHP_AUTH_PW'] !== $validPass)) {
-                header('WWW-Authenticate: Basic Realm="Tempest Dashboard"');
-                header('HTTP/1.0 401 Unauthorized');
-                echo "Authorization required";
-                return;
+        } elseif ($authMode === 3) { // Passkey (Biometric)
+            if ($secretsID > 0 && IPS_InstanceExists($secretsID)) {
+                if (!SEC_IsPortalAuthenticated($secretsID)) {
+                    $currentUrl = $_SERVER['REQUEST_URI'] ?? '';
+                    $loginUrl = "/hook/secrets_" . $secretsID . "?portal=1&return=" . urlencode($currentUrl);
+                    header("Location: " . $loginUrl);
+                    exit;
+                }
             }
         }
 
-        // 3. Render Dashboard with Standalone App wrapper
-        $dashboardHTML = $this->GetValue('Dashboard');
-        $bgColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLBackgroundColor'));
-        $title = $this->ReadPropertyString('StationName');
-
-        echo "<!DOCTYPE html>
-<html lang='en'>
-<head>
-    <meta charset='UTF-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
-    <title>$title</title>
-    <link rel='manifest' href='?manifest=1'>
-    <link rel='apple-touch-icon' href='https://weatherflow.github.io/Tempest/img/tempest-icon-192.png'>
-    <meta name='theme-color' content='$bgColor'>
-    <meta name='apple-mobile-web-app-capable' content='yes'>
-    <meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'>
-    <meta name='mobile-web-app-capable' content='yes'>
-    <meta name='apple-mobile-web-app-title' content='Tempest'>
-    <style>
-        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background-color: $bgColor; }
-        #container { width: 100%; height: 100%; }
-    </style>
-</head>
-<body>
-    <div id='container'>
-        $dashboardHTML
-    </div>
-</body>
-</html>";
-
-
-        // 2. Basic Auth Validation via Secrets Manager
-        $secretsID = $this->ReadPropertyInteger('SecretsInstanceID');
-        if ($secretsID > 0 && IPS_InstanceExists($secretsID)) {
+        // Only check Basic Auth for Manual or standard Secrets Manager modes
+        if ($authMode === 1 || $authMode === 2) {
             if (!isset($_SERVER['PHP_AUTH_USER'])) $_SERVER['PHP_AUTH_USER'] = "";
             if (!isset($_SERVER['PHP_AUTH_PW'])) $_SERVER['PHP_AUTH_PW'] = "";
-
-            $access_data = json_decode(SEC_GetSecret($secretsID, 'Webhooks'), true);
-            $validUser = $access_data['Tempest']['User'] ?? '';
-            $validPass = $access_data['Tempest']['PW'] ?? '';
 
             if (($_SERVER['PHP_AUTH_USER'] !== $validUser) || ($_SERVER['PHP_AUTH_PW'] !== $validPass)) {
                 header('WWW-Authenticate: Basic Realm="Tempest Dashboard"');
@@ -961,7 +922,7 @@ class TempestWeatherStation extends IPSModule
                         $item['visible'] = ($authMode === 1);
                     }
                     if ($item['name'] == 'SecretsInstanceID') {
-                        $item['visible'] = ($authMode === 2);
+                        $item['visible'] = ($authMode === 2 || $authMode === 3);
                     }
                 }
             }
@@ -1030,8 +991,8 @@ class TempestWeatherStation extends IPSModule
         $this->UpdateFormField('WebhookUser', 'visible', ($authMode === 1));
         $this->UpdateFormField('WebhookPassword', 'visible', ($authMode === 1));
 
-        // Mode 2 = Secrets Manager
-        $this->UpdateFormField('SecretsInstanceID', 'visible', ($authMode === 2));
+        // Mode 2 = Secrets Manager, Mode 3 = Passkey
+        $this->UpdateFormField('SecretsInstanceID', 'visible', ($authMode === 2 || $authMode === 3));
     }
 
     public function UpdateDashboardRow(string $HTMLVariableList)

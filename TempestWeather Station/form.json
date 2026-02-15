@@ -4,7 +4,8 @@
             { "type": "Select", "name": "AuthMode", "caption": "Authentication Mode", "options": [
                 { "caption": "None", "value": 0 },
                 { "caption": "Manual", "value": 1 },
-                { "caption": "Secrets Manager", "value": 2 }
+                { "caption": "Secrets Manager", "value": 2 },
+                { "caption": "Passkey (Secrets Manager)", "value": 3 }
             ], "onChange": "TMT_UpdateUI($id);" },
             { "type": "ValidationTextBox", "name": "WebhookUser", "caption": "Webhook User", "visible": false },
             { "type": "PasswordTextBox", "name": "WebhookPassword", "caption": "Webhook Password", "visible": false },
