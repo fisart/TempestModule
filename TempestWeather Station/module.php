@@ -491,10 +491,10 @@ class TempestWeatherStation extends IPSModule
         $chartTimeframe = $this->ReadPropertyInteger('ChartTimeframe');
         $chartColor = sprintf("#%06X", $this->ReadPropertyInteger('ChartColor'));
 
-        $timeID = @$this->GetIDForIdent('Time_Epoch');
+        $timeID = $this->GetIDForIdent('Time_Epoch');
         $timeStr = ($timeID !== 0 && IPS_VariableExists($timeID)) ? date('H:i:s', GetValue($timeID)) : '--:--:--';
 
-        $sysCondID = @$this->GetIDForIdent('System_Condition');
+        $sysCondID = $this->GetIDForIdent('System_Condition');
         $sysCondStr = ($sysCondID !== 0 && IPS_VariableExists($sysCondID)) ? GetValueFormatted($sysCondID) : '';
 
         $archiveID = $this->ReadPropertyInteger('ArchiveID');
@@ -504,26 +504,13 @@ class TempestWeatherStation extends IPSModule
         $chartScripts = "";
 
         foreach ($varList as $item) {
-            if (!isset($item['Ident']) || !($item['Show'] ?? false)) continue;
+            if (!($item['Show'] ?? false)) continue;
 
-            // Fix: Recursive search for the Ident to support variables inside sub-categories
-            $varID = @IPS_GetObjectIDByIdent($item['Ident'], $this->InstanceID);
-
-            // If not found directly, check sub-folders (Categories)
-            if ($varID === 0) {
-                $children = IPS_GetChildrenIDs($this->InstanceID);
-                foreach ($children as $child) {
-                    if (IPS_GetObject($child)['ObjectType'] === 0) { // Category
-                        $subID = @IPS_GetObjectIDByIdent($item['Ident'], $child);
-                        if ($subID !== 0) {
-                            $varID = $subID;
-                            break;
-                        }
-                    }
-                }
-            }
-
+            $varID = $this->GetIDForIdent($item['Ident']);
             if ($varID === 0 || !IPS_VariableExists($varID)) {
+                if ($varID === 0) {
+                    $this->LogMessage("GenerateHTMLDashboard: Ident '" . $item['Ident'] . "' not found.", KL_WARNING);
+                }
                 continue;
             }
 
@@ -576,7 +563,7 @@ class TempestWeatherStation extends IPSModule
                 $stationName <span style='font-size: 0.6em; opacity: 0.6; margin-left: 2cqi;'>($timeStr)</span>
                 <div style='font-size: 0.4em; opacity: 0.8; font-weight: normal; margin-top: 0.5cqi;'>$sysCondStr</div>
             </div>
-            <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1.5cqi; flex-grow: 1; margin-top: 2cqi;'>
+            <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1cqi; flex-grow: 1; margin-top: 1.5cqi;'>
                 $itemsHtml
             </div>
             <script>
@@ -967,7 +954,7 @@ class TempestWeatherStation extends IPSModule
                 }
             }
         }
-        unset($panel);
+        unset($panel); // CRITICAL: Destroy reference to prevent corruption of subsequent loops
 
         // 2. Prepare Dashboard Grid Data
         $master = $this->GetMasterMetadata();
@@ -977,11 +964,6 @@ class TempestWeatherStation extends IPSModule
         if (empty($values)) {
             $values = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
         }
-
-        // Fix: Structural cleanup - Remove entries without an Ident to "drain the swamp" of bad data
-        $values = array_values(array_filter($values, function ($v) {
-            return isset($v['Ident']) && !empty($v['Ident']);
-        }));
 
         $existingIdents = array_column($values, 'Ident');
         foreach ($values as &$val) {
@@ -1018,6 +1000,7 @@ class TempestWeatherStation extends IPSModule
                             unset($form['elements'][$k]['items'][$i]);
                         }
                     }
+                    // Re-index items to ensure the panel remains valid for the remaining properties
                     $form['elements'][$k]['items'] = array_values($form['elements'][$k]['items']);
                 }
             }
@@ -1052,14 +1035,11 @@ class TempestWeatherStation extends IPSModule
 
         $map = [];
         foreach ($buffer as $item) {
-            // Fix: Only transfer entries with a valid Ident to the map; this purges bad data from the buffer
-            if (isset($item['Ident']) && !empty($item['Ident'])) {
-                $map[$item['Ident']] = $item;
-            }
+            if (isset($item['Ident'])) $map[$item['Ident']] = $item;
         }
 
         foreach ($newData as $row) {
-            if (isset($row['Ident']) && !empty($row['Ident'])) {
+            if (isset($row['Ident'])) {
                 $row['Row'] = (int)$row['Row'];
                 $row['Col'] = (int)$row['Col'];
                 $row['Show'] = (bool)$row['Show'];
@@ -1069,7 +1049,7 @@ class TempestWeatherStation extends IPSModule
         }
 
         $this->WriteAttributeString('HTMLVariableListBuffer', json_encode(array_values($map)));
-        $this->SendDebug('UI-Update', 'RAM-Cache updated; malformed entries purged.', 0);
+        $this->SendDebug('UI-Update', 'RAM-Cache updated and types cast.', 0);
     }
 
     public function SaveSelections()
