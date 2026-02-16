@@ -31,6 +31,19 @@ Wenn der `AuthMode` auf "Secrets Manager" eingestellt ist, ruft das Modul Daten 
     ]
 ]
 ```
+1. Passkey
+Diese Erweiterung ermöglicht den Zugriff auf das Dashboard mittels moderner biometrischer Authentifizierung (Passkey). Anstatt Benutzername und Passwort manuell einzugeben, wird die Identität des Nutzers über das gesicherte Portal des Secrets Managers (z. B. via Fingerabdruck oder Gesichtserkennung) verifiziert.
+2. Prozesse
+Authentifizierungs-Prüfung: Beim Aufruf des Webhooks (/hook/tempest) prüft das Modul, ob der Modus "Passkey" aktiviert ist.
+Portal-Validierung: Das Modul kommuniziert intern mit der Secrets-Manager-Instanz und ruft die Funktion SEC_IsPortalAuthenticated auf.
+Dynamische Weiterleitung: Falls keine gültige Sitzung vorliegt, generiert das Modul automatisch eine verschlüsselte Rücksprung-URL (return) und leitet den Browser zum biometrischen Login-Portal des Secrets Managers um.
+Session-Management: Nach erfolgreicher biometrischer Bestätigung leitet das Portal den Nutzer zurück zum Dashboard, welches nun freigeschaltet ist.
+3. Eingangsdaten
+Konfiguration: Auswahl des Authentifizierungsmodus 3 und die Instanz-ID des Secrets Managers.
+Anfrage: Der HTTP-Request des Browsers inklusive der aktuellen Session-Informationen.
+4. Ausgangsdaten
+HTTP-Header: Ein Location-Redirect zum Login-Portal im Falle einer fehlenden Authentifizierung.
+Visualisierung: Die Dashboard-HTML-Seite (nur nach erfolgreicher biometrischer Verifizierung).
 
 ### **4. Prozesse & Logik**
 
@@ -86,7 +99,19 @@ If the `AuthMode` is set to "Secrets Manager", the module retrieves data from th
     ]
 ]
 ```
-
+1. Passkey
+This enhancement enables access to the dashboard using modern biometric authentication (Passkey). Instead of manually entering a username and password, the user's identity is verified through the secured portal of the Secrets Manager (e.g., via fingerprint or facial recognition).
+2. Processes
+Authentication Check: When the webhook (/hook/tempest) is accessed, the module checks if the "Passkey" mode is active.
+Portal Validation: The module communicates internally with the Secrets Manager instance and calls the function SEC_IsPortalAuthenticated.
+Dynamic Redirection: If no valid session exists, the module automatically generates an encrypted return URL (return) and redirects the browser to the biometric login portal of the Secrets Manager.
+Session Management: Upon successful biometric confirmation, the portal redirects the user back to the dashboard, which is then unlocked.
+3. Input Data
+Configuration: Selection of authentication mode 3 and the Instance ID of the Secrets Manager.
+Request: The HTTP request from the browser, including current session information.
+4. Output Data
+HTTP Header: A Location redirect to the login portal in case of missing authentication.
+Visualization: The Dashboard HTML page (only after successful biometric verification).
 ### **4. Processes & Logic**
 
 *   **Data Integrity (Back-filling):** Every incoming packet is validated against the Archive. If a packet arrives late (identified as `OLD_TIME_STAMP`), it is retroactively inserted into the archive at its original timestamp using `AC_AddLoggedValues`.
