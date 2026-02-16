@@ -433,7 +433,7 @@ class TempestWeatherStation extends IPSModule
         $statusID = $this->GetIDForIdent('Battery_Status');
         $slopeID = $this->GetIDForIdent('Slope');
         $avgID = $this->GetIDForIdent('Average');
-        $sysCondID = $this->GetIDForIdent('System_Condition');
+        $sysCondID = @IPS_GetObjectIDByIdent('System_Condition', $this->InstanceID);
 
         $oldSlope = GetValue($slopeID);
         $isCharging = (bool)GetValue($statusID);
@@ -465,10 +465,10 @@ class TempestWeatherStation extends IPSModule
         $chartTimeframe = $this->ReadPropertyInteger('ChartTimeframe');
         $chartColor = sprintf("#%06X", $this->ReadPropertyInteger('ChartColor'));
 
-        $timeID = @$this->GetIDForIdent('Time_Epoch');
+        $timeID = @IPS_GetObjectIDByIdent('Time_Epoch', $this->InstanceID);
         $timeStr = ($timeID !== 0 && IPS_VariableExists($timeID)) ? date('H:i:s', GetValue($timeID)) : '--:--:--';
 
-        $sysCondID = $this->GetIDForIdent('System_Condition');
+        $sysCondID = @IPS_GetObjectIDByIdent('System_Condition', $this->InstanceID);
         $sysCondStr = ($sysCondID !== 0 && IPS_VariableExists($sysCondID)) ? GetValueFormatted($sysCondID) : '';
 
         $archiveID = $this->ReadPropertyInteger('ArchiveID');
@@ -479,7 +479,7 @@ class TempestWeatherStation extends IPSModule
 
         foreach ($varList as $item) {
             if (!($item['Show'] ?? false)) continue;
-            $varID = @$this->GetIDForIdent($item['Ident']);
+            $varID = @IPS_GetObjectIDByIdent($item['Ident'], $this->InstanceID);
             if ($varID === 0 || !IPS_VariableExists($varID)) {
                 if ($varID === 0) {
                     $this->LogMessage("GenerateHTMLDashboard: Ident '" . $item['Ident'] . "' not found.", KL_WARNING);
