@@ -499,13 +499,15 @@ class TempestWeatherStation extends IPSModule
                         $chartType = 'area';
 
                         // Special Logic for Wind Barbs (Meteorological Standard)
-if ($item['Ident'] === 'Wind_Direction') {
+                        if ($item['Ident'] === 'Wind_Direction') {
                             $speedID = @IPS_GetObjectIDByIdent('Wind_Avg', $this->InstanceID);
                             if ($speedID && AC_GetLoggingStatus($archiveID, $speedID)) {
                                 $speedHistory = AC_GetLoggedValues($archiveID, $speedID, time() - ($chartTimeframe * 3600), time(), 0);
                                 $speedMap = [];
-                                foreach ($speedHistory as $sRow) { $speedMap[$sRow['TimeStamp']] = $sRow['Value']; }
-                                
+                                foreach ($speedHistory as $sRow) {
+                                    $speedMap[$sRow['TimeStamp']] = $sRow['Value'];
+                                }
+
                                 $speedPoints = []; // For the Area series
                                 $barbPoints = [];  // For the Arrows series
                                 foreach (array_reverse($history) as $row) {
@@ -524,17 +526,13 @@ if ($item['Ident'] === 'Wind_Direction') {
                                 $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($row['Value'], 2) . "]";
                             }
                             $dataString = "{ type: 'area', data: [" . implode(',', $points) . "] }";
-                        } else {
-                            foreach (array_reverse($history) as $row) {
-                                $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($row['Value'], 2) . "]";
-                            }
                         }
 
                         $dataString = implode(',', $points);
                         $chartID = "chart_" . $item['Ident'];
                         $chartHtml = "<div id='$chartID' style='width: 100%; height: 30px; margin-top: 5px;'></div>";
 
-$chartScripts .= "
+                        $chartScripts .= "
                         Highcharts.chart('$chartID', {
                             chart: { margin: [2, 5, 2, 5], backgroundColor: null, height: 30, skipClone: true },
                             title: { text: null }, credits: { enabled: false }, legend: { enabled: false }, accessibility: { enabled: false },
