@@ -601,7 +601,24 @@ class TempestWeatherStation extends IPSModule
             if (!isset($data[$name]) || is_array($data[$name])) continue;
             $val = $data[$name];
             $ident = 'dev_' . str_replace(' ', '_', $name);
-            if ($name == 'sensor_status') $val = $val & bindec('111111111');
+
+            if ($name == 'sensor_status') {
+                // Power-Booster Logik (Bits 10, 11, 16, 17)
+                $this->MaintainVariableSafe($ident . '_bit10', 'Booster-Status (Bit 10)', 0, '', $index + 68, true);
+                $this->HandleValueUpdate($ident . '_bit10', ($val & 0x200) > 0, $timestamp, 'NEW_VALUE');
+
+                $this->MaintainVariableSafe($ident . '_bit11', 'Booster-Status (Bit 11)', 0, '', $index + 69, true);
+                $this->HandleValueUpdate($ident . '_bit11', ($val & 0x400) > 0, $timestamp, 'NEW_VALUE');
+
+                $this->MaintainVariableSafe($ident . '_booster_empty', 'Power-Booster erschöpft', 0, '', $index + 70, true);
+                $this->HandleValueUpdate($ident . '_booster_empty', ($val & 0x8000) > 0, $timestamp, 'NEW_VALUE');
+
+                $this->MaintainVariableSafe($ident . '_booster_connected', 'Power-Booster extern', 0, '', $index + 71, true);
+                $this->HandleValueUpdate($ident . '_booster_connected', ($val & 0x10000) > 0, $timestamp, 'NEW_VALUE');
+
+                // Maske auf 17 Bits erweitert (0x1FFFF), um alle relevanten Bits im Hauptwert zu behalten
+                $val = $val & 0x1FFFF;
+            }
 
             $profileIdent = $this->GetProfileForName($name);
             // Fix: Use dynamic type lookup and safe maintenance to force correct variable type
@@ -895,7 +912,14 @@ class TempestWeatherStation extends IPSModule
         if (isset($config['descriptions']['device_status'])) {
             foreach ($config['descriptions']['device_status'] as $name) {
                 if ($name == 'Rohdaten') continue;
-                $master['dev_' . str_replace(' ', '_', $name)] = 'Device: ' . $name;
+                $ident = 'dev_' . str_replace(' ', '_', $name);
+                $master[$ident] = 'Device: ' . $name;
+                if ($name == 'sensor_status') {
+                    $master[$ident . '_bit10'] = 'Device: Booster-Status (Bit 10)';
+                    $master[$ident . '_bit11'] = 'Device: Booster-Status (Bit 11)';
+                    $master[$ident . '_booster_empty'] = 'Device: Power-Booster erschöpft';
+                    $master[$ident . '_booster_connected'] = 'Device: Power-Booster extern';
+                }
             }
         }
         // Hub Status
