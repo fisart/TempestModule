@@ -743,7 +743,7 @@ class TempestWeatherStation extends IPSModule
                 'energy' => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' W/m²', 'min' => 0, 'max' => 1000, 'step' => 1],
                 'lux' => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' Lx', 'min' => 0, 'max' => 120000, 'step' => 1],
                 'index' => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' UVI', 'min' => 0, 'max' => 15, 'step' => 0.01],
-                'mm' => ['type' => 2, 'digits' => 6, 'prefix' => '', 'suffix' => ' mm', 'min' => 0, 'max' => 100, 'step' => 0.000001],
+                'mm' => ['type' => 2, 'digits' => 3, 'prefix' => '', 'suffix' => ' mm', 'min' => 0, 'max' => 100, 'step' => 0.000001],
                 'km' => ['type' => 2, 'digits' => 2, 'prefix' => '', 'suffix' => ' km', 'min' => 0, 'max' => 100, 'step' => 0.01],
                 'rssi' => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' dB', 'min' => -100, 'max' => 0, 'step' => 1],
                 'seconds' => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => ' s', 'min' => 0, 'max' => 999999999, 'step' => 1],
