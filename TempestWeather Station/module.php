@@ -804,6 +804,7 @@ class TempestWeatherStation extends IPSModule
             'Regression Slope'              => 'slope',
             'Battery Status'                => 'battery_status',
             'System Condition'              => 'system_condition',
+            'Counter Slope Datasets'        => 'seconds',
             // Fix: Map sensor_status to the status profile
             'sensor_status'                 => 'status'
         ];
