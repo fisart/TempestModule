@@ -499,23 +499,31 @@ class TempestWeatherStation extends IPSModule
                         $chartType = 'area';
 
                         // Special Logic for Wind Barbs (Meteorological Standard)
-                        if ($item['Ident'] === 'Wind_Direction') {
+if ($item['Ident'] === 'Wind_Direction') {
                             $speedID = @IPS_GetObjectIDByIdent('Wind_Avg', $this->InstanceID);
                             if ($speedID && AC_GetLoggingStatus($archiveID, $speedID)) {
-                                $chartType = 'windbarb';
                                 $speedHistory = AC_GetLoggedValues($archiveID, $speedID, time() - ($chartTimeframe * 3600), time(), 0);
-                                // Map speed by timestamp for accurate merging
                                 $speedMap = [];
-                                foreach ($speedHistory as $sRow) {
-                                    $speedMap[$sRow['TimeStamp']] = $sRow['Value'];
-                                }
-
+                                foreach ($speedHistory as $sRow) { $speedMap[$sRow['TimeStamp']] = $sRow['Value']; }
+                                
+                                $speedPoints = []; // For the Area series
+                                $barbPoints = [];  // For the Arrows series
                                 foreach (array_reverse($history) as $row) {
                                     if (isset($speedMap[$row['TimeStamp']])) {
-                                        $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($speedMap[$row['TimeStamp']], 2) . "," . round($row['Value'], 2) . "]";
+                                        $sVal = round($speedMap[$row['TimeStamp']], 2);
+                                        $dVal = round($row['Value'], 2);
+                                        $ts = $row['TimeStamp'] * 1000;
+                                        $speedPoints[] = "[$ts, $sVal]";
+                                        $barbPoints[] = "[$ts, $sVal, $dVal]";
                                     }
                                 }
+                                $dataString = "{ type: 'area', data: [" . implode(',', $speedPoints) . "], color: '#7cb5ec', fillOpacity: 0.3, zIndex: 1 }, { type: 'windbarb', data: [" . implode(',', $barbPoints) . "], color: '$chartColor', zIndex: 2, vectorLength: 12, yOffset: -10 }";
                             }
+                        } else {
+                            foreach (array_reverse($history) as $row) {
+                                $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($row['Value'], 2) . "]";
+                            }
+                            $dataString = "{ type: 'area', data: [" . implode(',', $points) . "] }";
                         } else {
                             foreach (array_reverse($history) as $row) {
                                 $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($row['Value'], 2) . "]";
@@ -526,17 +534,17 @@ class TempestWeatherStation extends IPSModule
                         $chartID = "chart_" . $item['Ident'];
                         $chartHtml = "<div id='$chartID' style='width: 100%; height: 30px; margin-top: 5px;'></div>";
 
-                        $chartScripts .= "
+$chartScripts .= "
                         Highcharts.chart('$chartID', {
-                            chart: { type: '$chartType', margin: [0, 5, 0, 5], backgroundColor: null, height: 30, skipClone: true },
+                            chart: { margin: [2, 5, 2, 5], backgroundColor: null, height: 30, skipClone: true },
                             title: { text: null }, credits: { enabled: false }, legend: { enabled: false }, accessibility: { enabled: false },
-                            xAxis: { visible: false, type: 'datetime' }, yAxis: { visible: false },
+                            xAxis: { visible: false, type: 'datetime' }, yAxis: { visible: false, min: 0 },
                             tooltip: { enabled: true, headerFormat: '', pointFormat: '{point.x:%H:%M}: <b>{point.y}</b>', outside: true },
-plotOptions: { 
-                                series: { marker: { enabled: false }, lineWidth: 1, fillOpacity: 0.1, color: '$chartColor', animation: false },
-                                windbarb: { vectorLength: 10, offset: 0 } 
+                            plotOptions: { 
+                                series: { marker: { enabled: false }, lineWidth: 1, animation: false },
+                                area: { fillOpacity: 0.1 }
                             },
-                            series: [{ data: [$dataString] }]
+                            series: [$dataString]
                         });";
                     }
                 } else {
