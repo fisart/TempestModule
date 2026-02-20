@@ -532,9 +532,9 @@ class TempestWeatherStation extends IPSModule
                             title: { text: null }, credits: { enabled: false }, legend: { enabled: false }, accessibility: { enabled: false },
                             xAxis: { visible: false, type: 'datetime' }, yAxis: { visible: false },
                             tooltip: { enabled: true, headerFormat: '', pointFormat: '{point.x:%H:%M}: <b>{point.y}</b>', outside: true },
-                            plotOptions: { 
+plotOptions: { 
                                 series: { marker: { enabled: false }, lineWidth: 1, fillOpacity: 0.1, color: '$chartColor', animation: false },
-                                windbarb: { vectorLength: 12, dataGrouping: { enabled: true, approximation: 'average', units: [['minute', [15]]] } } 
+                                windbarb: { vectorLength: 10, offset: 0 } 
                             },
                             series: [{ data: [$dataString] }]
                         });";
@@ -565,9 +565,16 @@ class TempestWeatherStation extends IPSModule
             <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1cqi; flex-grow: 1; margin-top: 1.5cqi;'>
                 $itemsHtml
             </div>
-            <script>
+ <script>
                 (function() {
-                    $chartScripts
+                    function initCharts() {
+                        if (typeof Highcharts === 'undefined' || typeof Highcharts.seriesTypes.windbarb === 'undefined') {
+                            setTimeout(initCharts, 50);
+                            return;
+                        }
+                        $chartScripts
+                    }
+                    initCharts();
                 })();
             </script>
             $reloadScript
