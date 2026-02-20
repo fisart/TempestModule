@@ -496,20 +496,39 @@ class TempestWeatherStation extends IPSModule
                     $history = AC_GetLoggedValues($archiveID, $varID, time() - ($chartTimeframe * 3600), time(), 0);
                     if (is_array($history) && count($history) > 1) {
                         $points = [];
-                        foreach (array_reverse($history) as $row) {
-                            $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($row['Value'], 2) . "]";
+                        $chartType = 'area';
+
+                        // Special Logic for Wind Barbs (Meteorological Standard)
+                        if ($item['Ident'] === 'Wind_Direction') {
+                            $speedID = @IPS_GetObjectIDByIdent('Wind_Avg', $this->InstanceID);
+                            if ($speedID && AC_GetLoggingStatus($archiveID, $speedID)) {
+                                $chartType = 'windbarb';
+                                $speedHistory = AC_GetLoggedValues($archiveID, $speedID, time() - ($chartTimeframe * 3600), time(), 0);
+                                foreach (array_reverse($history) as $idx => $row) {
+                                    $speedVal = $speedHistory[count($speedHistory) - 1 - $idx]['Value'] ?? 0;
+                                    $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($speedVal, 2) . "," . round($row['Value'], 2) . "]";
+                                }
+                            }
+                        } else {
+                            foreach (array_reverse($history) as $row) {
+                                $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($row['Value'], 2) . "]";
+                            }
                         }
+
                         $dataString = implode(',', $points);
                         $chartID = "chart_" . $item['Ident'];
                         $chartHtml = "<div id='$chartID' style='width: 100%; height: 30px; margin-top: 5px;'></div>";
 
                         $chartScripts .= "
                         Highcharts.chart('$chartID', {
-                            chart: { type: 'area', margin: [0, 0, 0, 0], backgroundColor: null, height: 30, skipClone: true },
+                            chart: { type: '$chartType', margin: [0, 5, 0, 5], backgroundColor: null, height: 30, skipClone: true },
                             title: { text: null }, credits: { enabled: false }, legend: { enabled: false },
                             xAxis: { visible: false, type: 'datetime' }, yAxis: { visible: false },
                             tooltip: { enabled: true, headerFormat: '', pointFormat: '{point.x:%H:%M}: <b>{point.y}</b>', outside: true },
-                            plotOptions: { series: { marker: { enabled: false, states: { hover: { enabled: true } } }, lineWidth: 1, fillOpacity: 0.1, color: '$chartColor', animation: false } },
+                            plotOptions: { 
+                                series: { marker: { enabled: false }, lineWidth: 1, fillOpacity: 0.1, color: '$chartColor', animation: false },
+                                windbarb: { vectorLength: 12, dataGrouping: { enabled: true, approximation: 'average', units: [['minute', [15]]] } } 
+                            },
                             series: [{ data: [$dataString] }]
                         });";
                     }
