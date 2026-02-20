@@ -163,7 +163,7 @@ class TempestWeatherStation extends IPSModule
                 "theme_color" => $bgColor,
                 "icons" => [
                     [
-                        "src" => "https://tempestwx.com/img/icon-192.png",
+                        "src" => "https://tempestwx.com/images/logo.svg",
                         "sizes" => "192x192",
                         "type" => "image/png"
                     ]
@@ -223,7 +223,7 @@ class TempestWeatherStation extends IPSModule
     <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
     <title>$title</title>
     <link rel='manifest' href='?manifest=1'>
-    <link rel='apple-touch-icon' href='https://tempestwx.com/img/icon-192.png'>
+    <link rel='apple-touch-icon' href='https://tempestwx.com/images/logo.svg'>
     <meta name='theme-color' content='$bgColor'>
     <meta name='apple-mobile-web-app-capable' content='yes'>
     <meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'>
