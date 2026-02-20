@@ -756,7 +756,8 @@ class TempestWeatherStation extends IPSModule
                 'system_condition' => ['type' => 2, 'digits' => 3, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 3, 'step' => 0.001, 'associations' => null],
                 // Fix: Re-inserting the missing 'status' profile key
                 'status' => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 512, 'step' => 1, 'associations' => ['Text' => [0 => 'Sensors OK', 511 => 'Multiple Failures'], 'Color' => [0 => $green, 511 => $red]]],
-                'count'  => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 1000000, 'step' => 1]
+                'count'  => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 1000000, 'step' => 1],
+                'text'   => ['type' => 3, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 0, 'step' => 0]
             ],
             'charge' => ['Text' => [2.33 => '+ Hybernate', 2.355 => '+ Wind 5 Min NO Lightning+Rain', 2.375 => '+ Wind 1m', 2.39 => '+ Wind 1m', 2.41 => '+ Wind 6s', 2.415 => '+ Wind 6s', 2.455 => '+ Full Perf'], 'Color' => [2.33 => $purple, 2.355 => $red, 2.375 => $orange, 2.39 => $orange, 2.41 => $yellow, 2.415 => $yellow, 2.455 => $green]],
             'discharge' => ['Text' => [2.33 => '- Hybernate', 2.355 => '- Wind 5 Min NO Lightning+Rain', 2.375 => '- Wind 1m', 2.39 => '- Wind 1m', 2.41 => '- Wind 6s', 2.415 => '- Wind 6s', 2.455 => '- Full Perf'], 'Color' => [2.33 => $purple, 2.355 => $red, 2.375 => $orange, 2.39 => $orange, 2.41 => $yellow, 2.415 => $yellow, 2.455 => $green]]
