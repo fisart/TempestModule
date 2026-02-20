@@ -519,13 +519,13 @@ class TempestWeatherStation extends IPSModule
                                         $barbPoints[] = "[$ts, $sVal, $dVal]";
                                     }
                                 }
-                                $dataString = "{ type: 'area', data: [" . implode(',', $speedPoints) . "], color: '#7cb5ec', fillOpacity: 0.3, zIndex: 1 }, { type: 'windbarb', data: [" . implode(',', $barbPoints) . "], color: '$chartColor', zIndex: 2, vectorLength: 12, yOffset: -10 }";
+                                $dataString = "{ type: 'area', data: [" . implode(',', $speedPoints) . "], color: '$chartColor', fillOpacity: 0.3, zIndex: 1 }, { type: 'windbarb', data: [" . implode(',', $barbPoints) . "], color: '$chartColor', zIndex: 2, vectorLength: 12, yOffset: -10 }";
                             }
                         } else {
                             foreach (array_reverse($history) as $row) {
                                 $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($row['Value'], 2) . "]";
                             }
-                            $dataString = "{ type: 'area', data: [" . implode(',', $points) . "] }";
+                            $dataString = "{ type: 'area', data: [" . implode(',', $points) . "], color: '$chartColor' }";
                         }
 
                         $chartID = "chart_" . $item['Ident'];
