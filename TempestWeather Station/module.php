@@ -963,23 +963,20 @@ class TempestWeatherStation extends IPSModule
         $this->WriteAttributeString('HTMLVariableListBuffer', json_encode($values));
 
         // 3. Move List to Actions while keeping other Panel items
-        foreach ($form['elements'] as $k => $panel) {
-            if (isset($panel['caption']) && $panel['caption'] == 'Dashboard Customization') {
-                if (isset($panel['items']) && is_array($panel['items'])) {
-                    foreach ($panel['items'] as $i => $item) {
-                        if (isset($item['name']) && $item['name'] == 'HTMLVariableList') {
-                            $listComponent = $item;
-                            $listComponent['values'] = $values;
-                            $listComponent['onEdit'] = "TMT_UpdateDashboardRow(\$id, json_encode(\$HTMLVariableList));";
-                            $form['actions'][] = $listComponent;
-                            unset($form['elements'][$k]['items'][$i]);
-                        }
+        // 3. Inject list values into the existing HTMLVariableList (keep it inside the panel)
+        foreach ($form['elements'] as &$panel) {
+            if (($panel['caption'] ?? '') === 'Dashboard Customization' && isset($panel['items']) && is_array($panel['items'])) {
+                foreach ($panel['items'] as &$item) {
+                    if (($item['name'] ?? '') === 'HTMLVariableList') {
+                        $item['values'] = $values;
+                        $item['onEdit'] = "TMT_UpdateDashboardRow(\$id, json_encode(\$HTMLVariableList));";
                     }
-                    // Re-index items to ensure the panel remains valid for the remaining properties
-                    $form['elements'][$k]['items'] = array_values($form['elements'][$k]['items']);
                 }
+                unset($item);
             }
         }
+        unset($panel);
+
 
         return json_encode($form);
     }
