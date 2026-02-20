@@ -528,7 +528,6 @@ class TempestWeatherStation extends IPSModule
                             $dataString = "{ type: 'area', data: [" . implode(',', $points) . "] }";
                         }
 
-                        $dataString = implode(',', $points);
                         $chartID = "chart_" . $item['Ident'];
                         $chartHtml = "<div id='$chartID' style='width: 100%; height: 30px; margin-top: 5px;'></div>";
 
