@@ -772,7 +772,7 @@ class TempestWeatherStation extends IPSModule
                 'Radio_Status' => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 3, 'step' => 1, 'associations' => ['Text' => [0 => 'Off', 1 => 'On', 3 => 'Active'], 'Color' => [0 => $red, 1 => $blue, 3 => $green]]],
                 'system_condition' => ['type' => 2, 'digits' => 3, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 3, 'step' => 0.001, 'associations' => null],
                 // Fix: Re-inserting the missing 'status' profile key
-                'status' => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 512, 'step' => 1, 'associations' => ['Text' => [0 => 'Sensors OK', 511 => 'Multiple Failures'], 'Color' => [0 => $green, 511 => $red]]],
+                'status' => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 200000, 'step' => 1, 'associations' => ['Text' => [0 => 'Sensors OK', 511 => 'Multiple Failures'], 'Color' => [0 => $green, 511 => $red]]],
                 'count'  => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 1000000, 'step' => 1],
                 'text'   => ['type' => 3, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 0, 'step' => 0]
             ],
