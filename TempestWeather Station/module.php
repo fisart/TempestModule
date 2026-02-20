@@ -535,7 +535,7 @@ class TempestWeatherStation extends IPSModule
                         Highcharts.chart('$chartID', {
                             chart: { margin: [2, 5, 2, 5], backgroundColor: null, height: 30, skipClone: true },
                             title: { text: null }, credits: { enabled: false }, legend: { enabled: false }, accessibility: { enabled: false },
-                            xAxis: { visible: false, type: 'datetime' }, yAxis: { visible: false, min: 0 },
+                            xAxis: { visible: false, type: 'datetime' }, yAxis: { visible: false },
                             tooltip: { enabled: true, headerFormat: '', pointFormat: '{point.x:%H:%M}: <b>{point.y}</b>', outside: true },
                             plotOptions: { 
                                 series: { marker: { enabled: false }, lineWidth: 1, animation: false },
