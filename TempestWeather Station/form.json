@@ -12,7 +12,7 @@
             { "type": "NumberSpinner", "name": "SecretsInstanceID", "caption": "Secrets Manager Instance ID", "visible": false },
             { "type": "ValidationTextBox", "name": "StationName", "caption": "Station Name" },
             { "type": "ValidationTextBox", "name": "ProfilePrefix", "caption": "Profile Prefix" },
-            { "type": "SelectInstance", "name": "ArchiveID", "caption": "Archive Control", "validModules": "{43192F0B-135B-4CE7-A0A7-1475603F3060}" }
+            { "type": "SelectInstance", "name": "ArchiveID", "caption": "Archive Control", "validModules": ["{43192F0B-135B-4CE7-A0A7-1475603F3060}"] }
         ]},
         { "type": "ExpansionPanel", "caption": "Battery Regression (Experimental)", "items": [
             { "type": "CheckBox", "name": "ExperimentalRegression", "caption": "Enable Battery Hysteresis Logic" },
