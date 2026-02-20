@@ -928,6 +928,8 @@ class TempestWeatherStation extends IPSModule
             }
         }
         unset($panel); // CRITICAL: Destroy reference to prevent corruption of subsequent loops
+        unset($item);
+        unset($panel);
 
         // 2. Prepare Dashboard Grid Data
         $master = $this->GetMasterMetadata();
