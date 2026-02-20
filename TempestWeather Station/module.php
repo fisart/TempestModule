@@ -504,9 +504,16 @@ class TempestWeatherStation extends IPSModule
                             if ($speedID && AC_GetLoggingStatus($archiveID, $speedID)) {
                                 $chartType = 'windbarb';
                                 $speedHistory = AC_GetLoggedValues($archiveID, $speedID, time() - ($chartTimeframe * 3600), time(), 0);
-                                foreach (array_reverse($history) as $idx => $row) {
-                                    $speedVal = $speedHistory[count($speedHistory) - 1 - $idx]['Value'] ?? 0;
-                                    $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($speedVal, 2) . "," . round($row['Value'], 2) . "]";
+                                // Map speed by timestamp for accurate merging
+                                $speedMap = [];
+                                foreach ($speedHistory as $sRow) {
+                                    $speedMap[$sRow['TimeStamp']] = $sRow['Value'];
+                                }
+
+                                foreach (array_reverse($history) as $row) {
+                                    if (isset($speedMap[$row['TimeStamp']])) {
+                                        $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($speedMap[$row['TimeStamp']], 2) . "," . round($row['Value'], 2) . "]";
+                                    }
                                 }
                             }
                         } else {
