@@ -553,7 +553,7 @@ plotOptions: {
         }
 
         $reloadScript = ($interval > 0) ? "<script>setTimeout(function(){ location.reload(); }, " . (($interval + 2) * 1000) . ");</script>" : "";
-        $highChartsScript = "<script src='https://code.highcharts.com/highcharts.js'></script><script src='https://code.highcharts.com/highcharts-more.js'></script><script src='https://code.highcharts.com/modules/windbarb.js'></script>";
+        $highChartsScript = "<script src='https://code.highcharts.com/highcharts.js'></script><script src='https://code.highcharts.com/highcharts-more.js'></script><script src='https://code.highcharts.com/modules/datagrouping.js'></script><script src='https://code.highcharts.com/modules/windbarb.js'></script>";
 
         $html = "
         <div style='container-type: inline-size; background-color: $bgColor; color: $fontColor; font-family: \"Segoe UI\", sans-serif; height: 100%; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 1.5cqi; border-radius: 8px;'>
