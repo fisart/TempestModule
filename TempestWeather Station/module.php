@@ -519,7 +519,7 @@ class TempestWeatherStation extends IPSModule
                                         $barbPoints[] = "[$ts, $sVal, $dVal]";
                                     }
                                 }
-                                $dataString = "{ type: 'area', data: [" . implode(',', $speedPoints) . "], color: '$chartColor', fillOpacity: 0.3, zIndex: 1 }, { type: 'windbarb', data: [" . implode(',', $barbPoints) . "], color: '$fontColor', zIndex: 2, vectorLength: 50, yOffset: 0 , xOffset: 10 tooltip: { pointFormat: '{point.x:%H:%M}: <b>{point.direction}°</b>' } }";
+                                $dataString = "{ type: 'area', data: [" . implode(',', $speedPoints) . "], color: '$chartColor', fillOpacity: 0.3, zIndex: 1 }, { type: 'windbarb', data: [" . implode(',', $barbPoints) . "], color: '$fontColor', zIndex: 2, vectorLength: 50, yOffset: 0 , xOffset: 10, tooltip: { pointFormat: '{point.x:%H:%M}: <b>{point.direction}°</b>' } }";
                             }
                         } else {
                             foreach (array_reverse($history) as $row) {
