@@ -215,6 +215,8 @@ class TempestWeatherStation extends IPSModule
 
         // 3. Render Dashboard with Standalone App wrapper
         // 3. AJAX Update Handler (Flicker Suppression)
+        $dashboardHTML = $this->GetValue('Dashboard');
+
         if (isset($_GET['ajax'])) {
             header('Content-Type: text/html; charset=utf-8');
             echo $this->GetValue('Dashboard');
