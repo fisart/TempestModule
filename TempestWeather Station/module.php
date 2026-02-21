@@ -167,7 +167,7 @@ class TempestWeatherStation extends IPSModule
                     [
                         "src" => "https://tempestwx.com/images/logo.svg",
                         "sizes" => "192x192",
-                        "type" => "image/png"
+                        "type" => "image/svg+xml"
                     ]
                 ]
             ]);
