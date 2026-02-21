@@ -154,10 +154,12 @@ class TempestWeatherStation extends IPSModule
         if (isset($_GET['manifest'])) {
             header('Content-Type: application/json');
             $bgColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLBackgroundColor'));
+            $webhookPath = $this->ReadPropertyString('WebhookPath');
             echo json_encode([
                 "name" => $this->ReadPropertyString('StationName'),
                 "short_name" => "Tempest",
-                "start_url" => ".",
+                "start_url" => $webhookPath,
+                "scope" => $webhookPath,
                 "display" => "standalone",
                 "background_color" => $bgColor,
                 "theme_color" => $bgColor,
