@@ -34,6 +34,7 @@ class TempestWeatherStation extends IPSModule
 
         // Visualization & Dashboard
         $this->RegisterPropertyBoolean('EnableHTML', true);
+        $this->RegisterPropertyFloat('HTMLFontSizeValue', 4.5);
         $this->RegisterPropertyInteger('HTMLUpdateInterval', 0);
         $this->RegisterPropertyInteger('HTMLChartHeight', 60);
         $this->RegisterPropertyInteger('HTMLBackgroundColor', 0x222222);
@@ -475,6 +476,7 @@ class TempestWeatherStation extends IPSModule
         $chartTimeframe = $this->ReadPropertyInteger('ChartTimeframe');
         $chartColor = sprintf("#%06X", $this->ReadPropertyInteger('ChartColor'));
         $cHeight = $this->ReadPropertyInteger('HTMLChartHeight');
+        $valFontSize = $this->ReadPropertyFloat('HTMLFontSizeValue');
         $timeID = @IPS_GetObjectIDByIdent('Time_Epoch', $this->InstanceID);
         $timeStr = ($timeID !== 0 && IPS_VariableExists($timeID)) ? date('H:i:s', GetValue($timeID)) : '--:--:--';
 
@@ -562,7 +564,7 @@ class TempestWeatherStation extends IPSModule
             $itemsHtml .= "
             <div style='grid-area: {$item['Row']} / {$item['Col']}; border: 1px solid rgba(255,255,255,0.1); padding: 1cqi; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 4px; overflow: hidden;'>
                 <div style='font-size: clamp(8px, 2.2cqi, 18px); opacity: 0.7; white-space: nowrap; text-overflow: ellipsis; width: 100%; overflow: hidden;'>$label</div>
-                <div style='font-size: clamp(10px, 4.5cqi, 36px); font-weight: bold; white-space: nowrap;'>$formatted</div>
+                <div style='font-size: clamp(10px, {$valFontSize}cqi, 48px); font-weight: bold; white-space: nowrap;'>$formatted</div>
                 $chartHtml
             </div>";
         }
