@@ -528,7 +528,7 @@ class TempestWeatherStation extends IPSModule
                                         $barbPoints[] = "[$ts, $sVal, $dVal]";
                                     }
                                 }
-                                $dataString = "{ type: 'area', data: [" . implode(',', $speedPoints) . "], color: '$chartColor', fillOpacity: 0.3, zIndex: 1, tooltip: { pointFormat: '{point.x:%H:%M}: <b>{point.y:.1f} km/h</b>' } }, { type: 'windbarb', data: [" . implode(',', $barbPoints) . "], color: '$fontColor', zIndex: 2, vectorLength: 50, yOffset: 0 , xOffset: 10, tooltip: { pointFormat: '{point.x:%H:%M}: <b>{point.direction:.0f}°</b>' } }";
+                                $dataString = "{ type: 'area', data: [" . implode(',', $speedPoints) . "], color: '$chartColor', fillOpacity: 0.3, zIndex: 1, tooltip: { pointFormat: '{point.x:%H:%M}: <b>{point.y:.1f} km/h</b>' } }, { type: 'windbarb', data: [" . implode(',', $barbPoints) . "], color: '$fontColor', zIndex: 2, vectorLength: " . ($cHeight * 0.8) . ", yOffset: -" . ($cHeight / 2) . ", xOffset: 10, tooltip: { pointFormat: '{point.x:%H:%M}: <b>{point.direction:.0f}°</b>' } }";
                             }
                         } else {
                             foreach (array_reverse($history) as $row) {
@@ -538,11 +538,11 @@ class TempestWeatherStation extends IPSModule
                         }
 
                         $chartID = "chart_" . $item['Ident'];
-                        $chartHtml = "<div id='$chartID' style='width: 100%; height: 60px; margin-top: 5px;'></div>";
+                        $chartHtml = "<div id='$chartID' style='width: 100%; height: {$cHeight}px; margin-top: 5px;'></div>";
 
                         $chartScripts .= "
                         Highcharts.chart('$chartID', {
-                            chart: { margin: [2, 5, 2, 5], backgroundColor: null, height: 60, skipClone: true },
+                            chart: { margin: [2, 5, 2, 5], backgroundColor: null, height: $cHeight, skipClone: true },
                             title: { text: null }, credits: { enabled: false }, legend: { enabled: false }, accessibility: { enabled: false },
                             xAxis: { visible: false, type: 'datetime' }, yAxis: { visible: false },
                             tooltip: { enabled: true, headerFormat: '', pointFormat: '{point.x:%H:%M}: <b>{point.y}</b>', outside: true },
