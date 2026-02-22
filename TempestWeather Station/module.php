@@ -35,6 +35,7 @@ class TempestWeatherStation extends IPSModule
         // Visualization & Dashboard
         $this->RegisterPropertyBoolean('EnableHTML', true);
         $this->RegisterPropertyInteger('HTMLUpdateInterval', 0);
+        $this->RegisterPropertyInteger('HTMLChartHeight', 60);
         $this->RegisterPropertyInteger('HTMLBackgroundColor', 0x222222);
         $this->RegisterPropertyInteger('HTMLFontColor', 0xFFFFFF);
         $this->RegisterPropertyInteger('ChartTimeframe', 24);
@@ -473,7 +474,7 @@ class TempestWeatherStation extends IPSModule
         $interval = $this->ReadPropertyInteger('HTMLUpdateInterval');
         $chartTimeframe = $this->ReadPropertyInteger('ChartTimeframe');
         $chartColor = sprintf("#%06X", $this->ReadPropertyInteger('ChartColor'));
-        $cHeight = 60;
+        $cHeight = $this->ReadPropertyInteger('HTMLChartHeight');
         $timeID = @IPS_GetObjectIDByIdent('Time_Epoch', $this->InstanceID);
         $timeStr = ($timeID !== 0 && IPS_VariableExists($timeID)) ? date('H:i:s', GetValue($timeID)) : '--:--:--';
 
