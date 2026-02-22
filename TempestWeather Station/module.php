@@ -549,7 +549,7 @@ class TempestWeatherStation extends IPSModule
                             tooltip: { enabled: true, headerFormat: '', pointFormat: '{point.x:%H:%M}: <b>{point.y}</b>', outside: true },
                             plotOptions: { 
                                 series: { marker: { enabled: false }, lineWidth: 1, animation: false },
-                                area: { fillOpacity: 0.1 }
+                                area: { fillOpacity: 0.1, threshold: null }
                             },
                             series: [$dataString]
                         });";
