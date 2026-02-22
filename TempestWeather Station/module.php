@@ -538,11 +538,11 @@ class TempestWeatherStation extends IPSModule
                         }
 
                         $chartID = "chart_" . $item['Ident'];
-                        $chartHtml = "<div id='$chartID' style='width: 100%; height: 30px; margin-top: 5px;'></div>";
+                        $chartHtml = "<div id='$chartID' style='width: 100%; height: 60px; margin-top: 5px;'></div>";
 
                         $chartScripts .= "
                         Highcharts.chart('$chartID', {
-                            chart: { margin: [2, 5, 2, 5], backgroundColor: null, height: 30, skipClone: true },
+                            chart: { margin: [2, 5, 2, 5], backgroundColor: null, height: 60, skipClone: true },
                             title: { text: null }, credits: { enabled: false }, legend: { enabled: false }, accessibility: { enabled: false },
                             xAxis: { visible: false, type: 'datetime' }, yAxis: { visible: false },
                             tooltip: { enabled: true, headerFormat: '', pointFormat: '{point.x:%H:%M}: <b>{point.y}</b>', outside: true },
