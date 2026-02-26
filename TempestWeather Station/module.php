@@ -39,6 +39,7 @@ class TempestWeatherStation extends IPSModule
         $this->RegisterPropertyInteger('HTMLChartHeight', 60);
         $this->RegisterPropertyInteger('HTMLBackgroundColor', 0x222222);
         $this->RegisterPropertyInteger('HTMLFontColor', 0xFFFFFF);
+        $this->RegisterPropertyString('HTMLTimezone', 'UTC');
         $this->RegisterPropertyInteger('ChartTimeframe', 24);
         $this->RegisterPropertyInteger('ChartColor', 0xFFFFFF);
         $this->RegisterPropertyString('HTMLVariableList', json_encode([
@@ -477,9 +478,10 @@ class TempestWeatherStation extends IPSModule
         $chartColor = sprintf("#%06X", $this->ReadPropertyInteger('ChartColor'));
         $cHeight = $this->ReadPropertyInteger('HTMLChartHeight');
         $valFontSize = $this->ReadPropertyFloat('HTMLFontSizeValue');
+        $tz = new DateTimeZone($this->ReadPropertyString('HTMLTimezone'));
+        $tzOffset = ($tz->getOffset(new DateTime('now', $tz)) / 60) * -1;
         $timeID = @IPS_GetObjectIDByIdent('Time_Epoch', $this->InstanceID);
-        $timeStr = ($timeID !== 0 && IPS_VariableExists($timeID)) ? date('H:i:s', GetValue($timeID)) : '--:--:--';
-
+        $timeStr = ($timeID !== 0 && IPS_VariableExists($timeID)) ? (new DateTime('@' . GetValue($timeID)))->setTimezone($tz)->format('H:i:s') : '--:--:--';
         $sysCondID = @IPS_GetObjectIDByIdent('System_Condition', $this->InstanceID);
         $sysCondStr = ($sysCondID !== 0 && IPS_VariableExists($sysCondID)) ? GetValueFormatted($sysCondID) : '';
 
@@ -509,6 +511,9 @@ class TempestWeatherStation extends IPSModule
                     if (is_array($history) && count($history) > 1) {
                         $points = [];
                         $chartType = 'area';
+                        if ($item['Ident'] === 'Precip_Accumulated') {
+                            $chartType = 'column';
+                        }
 
                         // Special Logic for Wind Barbs (Meteorological Standard)
                         if ($item['Ident'] === 'Wind_Direction') {
@@ -549,10 +554,7 @@ class TempestWeatherStation extends IPSModule
                             title: { text: null }, credits: { enabled: false }, legend: { enabled: false }, accessibility: { enabled: false },
                             xAxis: { visible: false, type: 'datetime' }, yAxis: { visible: false },
                             tooltip: { enabled: true, headerFormat: '', pointFormat: '{point.x:%H:%M}: <b>{point.y}</b>', outside: true },
-                            plotOptions: { 
-                                series: { marker: { enabled: false }, lineWidth: 1, animation: false },
-                                area: { fillOpacity: 0.1, threshold: null }
-                            },
+                            plotOptions: { series: { marker: { enabled: false }, lineWidth: 1, animation: false }, area: { fillOpacity: 0.1, threshold: null }, column: { borderWidth: 0, color: '$chartColor', pointPadding: 0.1 } },
                             series: [$dataString]
                         });";
                     }
@@ -599,20 +601,21 @@ class TempestWeatherStation extends IPSModule
             <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1cqi; flex-grow: 1; margin-top: 1.5cqi;'>
                 $itemsHtml
             </div>
- <script>
-                (function() {
-                    function initCharts() {
-                        if (typeof Highcharts === 'undefined' || typeof Highcharts.seriesTypes.windbarb === 'undefined') {
-                            setTimeout(initCharts, 50);
-                            return;
+        <script>
+                        (function() {
+                            function initCharts() {
+                                if (typeof Highcharts === 'undefined' || typeof Highcharts.seriesTypes.windbarb === 'undefined') {
+                                    setTimeout(initCharts, 50);
+                                   return;
                         }
+                        Highcharts.setOptions({ time: { timezoneOffset: $tzOffset } });
                         $chartScripts
                     }
-                    initCharts();
-                })();
-            </script>
-            $reloadScript
-        </div>";
+                            initCharts();
+                        })();
+                    </script>
+                    $reloadScript
+                </div>";
 
         $this->SetValue('Dashboard', $html);
     }
@@ -670,21 +673,21 @@ class TempestWeatherStation extends IPSModule
             $ident = 'dev_' . str_replace(' ', '_', $name);
 
             if ($name == 'sensor_status') {
-                // Power-Booster Logik (Bits 10, 11, 16, 17)
-                $this->MaintainVariableSafe($ident . '_bit10', 'Booster-Status (Bit 10)', 0, '', $index + 68, true);
-                $this->HandleValueUpdate($ident . '_bit10', ($val & 0x200) > 0, $timestamp, 'NEW_VALUE');
+                // Power-Booster Logik v171 (Bits 10, 11, 16, 17)
+                $this->MaintainVariableSafe($ident . '_booster_present', 'Power-Booster vorhanden', 0, '', $index + 68, true);
+                $this->HandleValueUpdate($ident . '_booster_present', ($val & 0x400) > 0, $timestamp, 'NEW_VALUE');
 
-                $this->MaintainVariableSafe($ident . '_bit11', 'Booster-Status (Bit 11)', 0, '', $index + 69, true);
-                $this->HandleValueUpdate($ident . '_bit11', ($val & 0x400) > 0, $timestamp, 'NEW_VALUE');
+                $this->MaintainVariableSafe($ident . '_bit11', 'Status (Bit 11 - nicht dokumentiert)', 0, '', $index + 69, true);
+                $this->HandleValueUpdate($ident . '_bit11', ($val & 0x800) > 0, $timestamp, 'NEW_VALUE');
 
-                $this->MaintainVariableSafe($ident . '_booster_empty', 'Power-Booster erschöpft', 0, '', $index + 70, true);
-                $this->HandleValueUpdate($ident . '_booster_empty', ($val & 0x8000) > 0, $timestamp, 'NEW_VALUE');
+                $this->MaintainVariableSafe($ident . '_booster_empty', 'Power-Booster Batterien leer', 0, '', $index + 70, true);
+                $this->HandleValueUpdate($ident . '_booster_empty', ($val & 0x10000) > 0, $timestamp, 'NEW_VALUE');
 
-                $this->MaintainVariableSafe($ident . '_booster_connected', 'Power-Booster extern', 0, '', $index + 71, true);
-                $this->HandleValueUpdate($ident . '_booster_connected', ($val & 0x10000) > 0, $timestamp, 'NEW_VALUE');
+                $this->MaintainVariableSafe($ident . '_booster_external', 'Power-Booster extern versorgt', 0, '', $index + 71, true);
+                $this->HandleValueUpdate($ident . '_booster_external', ($val & 0x20000) > 0, $timestamp, 'NEW_VALUE');
 
-                // Maske auf 17 Bits erweitert (0x1FFFF), um alle relevanten Bits im Hauptwert zu behalten
-                $val = $val & 0x1FFFF;
+                // Maske auf 18 Bits erweitert (0x3FFFF), um alle relevanten Bits im Hauptwert zu behalten
+                $val = $val & 0x3FFFF;
             }
 
             $profileIdent = $this->GetProfileForName($name);
@@ -982,10 +985,10 @@ class TempestWeatherStation extends IPSModule
                 $ident = 'dev_' . str_replace(' ', '_', $name);
                 $master[$ident] = 'Device: ' . $name;
                 if ($name == 'sensor_status') {
-                    $master[$ident . '_bit10'] = 'Device: Booster-Status (Bit 10)';
-                    $master[$ident . '_bit11'] = 'Device: Booster-Status (Bit 11)';
-                    $master[$ident . '_booster_empty'] = 'Device: Power-Booster erschöpft';
-                    $master[$ident . '_booster_connected'] = 'Device: Power-Booster extern';
+                    $master[$ident . '_booster_present'] = 'Device: Power-Booster vorhanden';
+                    $master[$ident . '_bit11'] = 'Device: Status (Bit 11 - nicht dokumentiert)';
+                    $master[$ident . '_booster_empty'] = 'Device: Power-Booster Batterien leer';
+                    $master[$ident . '_booster_external'] = 'Device: Power-Booster extern versorgt';
                 }
             }
         }
