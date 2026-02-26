@@ -478,10 +478,13 @@ class TempestWeatherStation extends IPSModule
         $chartColor = sprintf("#%06X", $this->ReadPropertyInteger('ChartColor'));
         $cHeight = $this->ReadPropertyInteger('HTMLChartHeight');
         $valFontSize = $this->ReadPropertyFloat('HTMLFontSizeValue');
+
+        // Fix: Calculate Timezone Offset and Localized Header Time
         $tz = new DateTimeZone($this->ReadPropertyString('HTMLTimezone'));
         $tzOffset = ($tz->getOffset(new DateTime('now', $tz)) / 60) * -1;
         $timeID = @IPS_GetObjectIDByIdent('Time_Epoch', $this->InstanceID);
         $timeStr = ($timeID !== 0 && IPS_VariableExists($timeID)) ? (new DateTime('@' . GetValue($timeID)))->setTimezone($tz)->format('H:i:s') : '--:--:--';
+
         $sysCondID = @IPS_GetObjectIDByIdent('System_Condition', $this->InstanceID);
         $sysCondStr = ($sysCondID !== 0 && IPS_VariableExists($sysCondID)) ? GetValueFormatted($sysCondID) : '';
 
@@ -492,14 +495,24 @@ class TempestWeatherStation extends IPSModule
         $chartScripts = "";
 
         foreach ($varList as $item) {
-            if (!($item['Show'] ?? false)) continue;
+            if (!isset($item['Ident']) || !($item['Show'] ?? false)) continue;
+
             $varID = @IPS_GetObjectIDByIdent($item['Ident'], $this->InstanceID);
-            if ($varID === 0 || !IPS_VariableExists($varID)) {
-                if ($varID === 0) {
-                    $this->LogMessage("GenerateHTMLDashboard: Ident '" . $item['Ident'] . "' not found.", KL_WARNING);
+
+            if ($varID === 0) {
+                $children = IPS_GetChildrenIDs($this->InstanceID);
+                foreach ($children as $child) {
+                    if (IPS_GetObject($child)['ObjectType'] === 0) {
+                        $subID = @IPS_GetObjectIDByIdent($item['Ident'], $child);
+                        if ($subID !== 0) {
+                            $varID = $subID;
+                            break;
+                        }
+                    }
                 }
-                continue;
             }
+
+            if ($varID === 0 || !IPS_VariableExists($varID)) continue;
 
             $formatted = GetValueFormatted($varID);
             $label = $item['Label'] ?? $item['Ident'] ?? 'Unknown';
@@ -510,12 +523,7 @@ class TempestWeatherStation extends IPSModule
                     $history = AC_GetLoggedValues($archiveID, $varID, time() - ($chartTimeframe * 3600), time(), 0);
                     if (is_array($history) && count($history) > 1) {
                         $points = [];
-                        $chartType = 'area';
-                        if ($item['Ident'] === 'Precip_Accumulated') {
-                            $chartType = 'column';
-                        }
 
-                        // Special Logic for Wind Barbs (Meteorological Standard)
                         if ($item['Ident'] === 'Wind_Direction') {
                             $speedID = @IPS_GetObjectIDByIdent('Wind_Avg', $this->InstanceID);
                             if ($speedID && AC_GetLoggingStatus($archiveID, $speedID)) {
@@ -525,8 +533,8 @@ class TempestWeatherStation extends IPSModule
                                     $speedMap[$sRow['TimeStamp']] = $sRow['Value'];
                                 }
 
-                                $speedPoints = []; // For the Area series
-                                $barbPoints = [];  // For the Arrows series
+                                $speedPoints = [];
+                                $barbPoints = [];
                                 foreach (array_reverse($history) as $row) {
                                     if (isset($speedMap[$row['TimeStamp']])) {
                                         $sVal = round($speedMap[$row['TimeStamp']], 2);
@@ -591,6 +599,7 @@ class TempestWeatherStation extends IPSModule
                 });
             }, " . ($secondsToWait * 1000) . ");</script>";
         }
+
         $html = "
         <div style='container-type: inline-size; background-color: $bgColor; color: $fontColor; font-family: \"Segoe UI\", sans-serif; height: 100%; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 1.5cqi; border-radius: 8px;'>
             $highChartsScript
@@ -601,21 +610,21 @@ class TempestWeatherStation extends IPSModule
             <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1cqi; flex-grow: 1; margin-top: 1.5cqi;'>
                 $itemsHtml
             </div>
-        <script>
-                        (function() {
-                            function initCharts() {
-                                if (typeof Highcharts === 'undefined' || typeof Highcharts.seriesTypes.windbarb === 'undefined') {
-                                    setTimeout(initCharts, 50);
-                                   return;
+            <script>
+                (function() {
+                    function initCharts() {
+                        if (typeof Highcharts === 'undefined' || typeof Highcharts.seriesTypes.windbarb === 'undefined') {
+                            setTimeout(initCharts, 50);
+                            return;
                         }
                         Highcharts.setOptions({ time: { timezoneOffset: $tzOffset } });
                         $chartScripts
                     }
-                            initCharts();
-                        })();
-                    </script>
-                    $reloadScript
-                </div>";
+                    initCharts();
+                })();
+            </script>
+            $reloadScript
+        </div>";
 
         $this->SetValue('Dashboard', $html);
     }
