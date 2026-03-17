@@ -285,8 +285,6 @@ class TempestWeatherStation extends IPSModule
                 if ($this->ReadPropertyBoolean('MsgStrike')) $this->ProcessStrike($payload);
                 break;
         }
-
-        $this->GenerateHTMLDashboard();
     }
 
     private function ProcessObservation(array $data)
