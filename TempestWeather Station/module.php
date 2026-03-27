@@ -521,7 +521,13 @@ class TempestWeatherStation extends IPSModule
                     $history = AC_GetLoggedValues($archiveID, $varID, time() - ($chartTimeframe * 3600), time(), 0);
                     if (is_array($history) && count($history) > 1) {
                         $points = [];
+                        $chartType = 'area';
 
+                        if (in_array($item['Ident'], ['Precip_Accumulated', 'Lightning_Strike_Count'])) {
+                            $chartType = 'column';
+                        }
+
+                        // Special Logic for Wind Barbs (Meteorological Standard)
                         if ($item['Ident'] === 'Wind_Direction') {
                             $speedID = @IPS_GetObjectIDByIdent('Wind_Avg', $this->InstanceID);
                             if ($speedID && AC_GetLoggingStatus($archiveID, $speedID)) {
@@ -542,12 +548,18 @@ class TempestWeatherStation extends IPSModule
                                         $barbPoints[] = "[$ts, $sVal, $dVal]";
                                     }
                                 }
+                                // Fix: Append virtual point at current time to show speed continuing to now
+                                $speedPoints[] = "[" . (time() * 1000) . "," . round($speedHistory[0]['Value'] ?? 0, 2) . "]";
+
                                 $dataString = "{ type: 'area', data: [" . implode(',', $speedPoints) . "], color: '$chartColor', fillOpacity: 0.3, zIndex: 1, tooltip: { pointFormat: '{point.x:%H:%M}: <b>{point.y:.1f} km/h</b>' } }, { type: 'windbarb', data: [" . implode(',', $barbPoints) . "], color: '$fontColor', zIndex: 2, vectorLength: " . ($cHeight * 0.8) . ", yOffset: -" . ($cHeight / 2) . ", xOffset: 10, tooltip: { pointFormat: '{point.x:%H:%M}: <b>{point.direction:.0f}°</b>' } }";
                             }
                         } else {
                             foreach (array_reverse($history) as $row) {
                                 $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($row['Value'], 2) . "]";
                             }
+                            // Fix: Append virtual point at current time using the latest value
+                            $points[] = "[" . (time() * 1000) . "," . round($history[0]['Value'], 2) . "]";
+
                             $dataString = "{ type: 'area', data: [" . implode(',', $points) . "], color: '$chartColor' }";
                         }
 
@@ -680,21 +692,20 @@ class TempestWeatherStation extends IPSModule
             $ident = 'dev_' . str_replace(' ', '_', $name);
 
             if ($name == 'sensor_status') {
-                // Power-Booster Logik v171 (Bits 10, 11, 16, 17)
+                // Power-Booster Logik korrigiert (Bit n = Index n-1)
                 $this->MaintainVariableSafe($ident . '_booster_present', 'Power-Booster vorhanden', 0, '', $index + 68, true);
-                $this->HandleValueUpdate($ident . '_booster_present', ($val & 0x400) > 0, $timestamp, 'NEW_VALUE');
+                $this->HandleValueUpdate($ident . '_booster_present', ($val & 0x200) > 0, $timestamp, 'NEW_VALUE'); // Index 9
 
                 $this->MaintainVariableSafe($ident . '_bit11', 'Status (Bit 11 - nicht dokumentiert)', 0, '', $index + 69, true);
-                $this->HandleValueUpdate($ident . '_bit11', ($val & 0x800) > 0, $timestamp, 'NEW_VALUE');
+                $this->HandleValueUpdate($ident . '_bit11', ($val & 0x400) > 0, $timestamp, 'NEW_VALUE'); // Index 10
 
                 $this->MaintainVariableSafe($ident . '_booster_empty', 'Power-Booster Batterien leer', 0, '', $index + 70, true);
-                $this->HandleValueUpdate($ident . '_booster_empty', ($val & 0x10000) > 0, $timestamp, 'NEW_VALUE');
+                $this->HandleValueUpdate($ident . '_booster_empty', ($val & 0x8000) > 0, $timestamp, 'NEW_VALUE'); // Index 15
 
                 $this->MaintainVariableSafe($ident . '_booster_external', 'Power-Booster extern versorgt', 0, '', $index + 71, true);
-                $this->HandleValueUpdate($ident . '_booster_external', ($val & 0x20000) > 0, $timestamp, 'NEW_VALUE');
+                $this->HandleValueUpdate($ident . '_booster_external', ($val & 0x10000) > 0, $timestamp, 'NEW_VALUE'); // Index 16
 
-                // Maske auf 18 Bits erweitert (0x3FFFF), um alle relevanten Bits im Hauptwert zu behalten
-                $val = $val & 0x3FFFF;
+                $val = $val & 0x1FFFF; // Maske auf 17 Bits angepasst
             }
 
             $profileIdent = $this->GetProfileForName($name);
