@@ -222,7 +222,9 @@ class TempestWeatherStation extends IPSModule
 
         if (isset($_GET['ajax'])) {
             header('Content-Type: text/html; charset=utf-8');
-            echo $this->GetValue('Dashboard');
+            // Wir filtern die Script-Tags für die Bibliotheken heraus, da diese bereits geladen sind
+            $html = $this->GetValue('Dashboard');
+            echo preg_replace('/<script src=.*?><\/script>/i', '', $html);
             return;
         }
         $bgColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLBackgroundColor'));
@@ -601,9 +603,14 @@ class TempestWeatherStation extends IPSModule
             $secondsToWait = max(1, ($nextUpdate - time()) + 2);
             $reloadScript = "<script>setTimeout(function(){ 
                 const url = new URL(window.location.href); url.searchParams.set('ajax', '1');
-                fetch(url).then(r => r.text()).then(html => {
+fetch(url).then(r => r.text()).then(html => {
                     const c = document.getElementById('container');
-                    if (c) {
+                    if (c && typeof Highcharts !== 'undefined') {
+                        // Speicher freigeben: Alle bestehenden Charts zerstören
+                        while (Highcharts.charts.length > 0) {
+                            if (Highcharts.charts[0]) Highcharts.charts[0].destroy();
+                            Highcharts.charts.shift();
+                        }
                         c.innerHTML = html;
                         const s = c.getElementsByTagName('script');
                         for (let i=0; i<s.length; i++) { if(s[i].innerText.includes('initCharts')) eval(s[i].innerText); }
