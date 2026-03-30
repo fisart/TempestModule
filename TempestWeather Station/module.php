@@ -513,7 +513,8 @@ class TempestWeatherStation extends IPSModule
             if ($varID === 0 || !IPS_VariableExists($varID)) continue;
 
             $formatted = GetValueFormatted($varID);
-            $label = $item['Label'] ?? $item['Ident'] ?? 'Unknown';
+            // Fix: Use actual variable name from object tree to support localization
+            $label = IPS_GetName($varID);
             $chartHtml = "";
 
             if (($item['ShowChart'] ?? false) && $archiveReady) {
@@ -560,7 +561,8 @@ class TempestWeatherStation extends IPSModule
                             // Fix: Append virtual point at current time using the latest value
                             $points[] = "[" . (time() * 1000) . "," . round($history[0]['Value'], 2) . "]";
 
-                            $dataString = "{ type: 'area', data: [" . implode(',', $points) . "], color: '$chartColor' }";
+                            // Fix: Use dynamic $chartType variable instead of hardcoded 'area'
+                            $dataString = "{ type: '$chartType', data: [" . implode(',', $points) . "], color: '$chartColor' }";
                         }
 
                         $chartID = "chart_" . $item['Ident'];
