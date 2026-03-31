@@ -224,7 +224,12 @@ class TempestWeatherStation extends IPSModule
             header('Content-Type: text/html; charset=utf-8');
             // Wir filtern die Script-Tags für die Bibliotheken heraus, da diese bereits geladen sind
             $html = $this->GetValue('Dashboard');
-            echo preg_replace('/<script src=.*?><\/script>/i', '', $html);
+            $html = preg_replace('/<script\s+src=.*?><\/script>/i', '', $html);
+
+            // Entferne NUR das Reload-Timer Script (damit es sich nicht vervielfacht)
+            $html = preg_replace('/<script\b[^>]*>.*?url\.searchParams\.set\([\'"]ajax[\'"]\s*,\s*[\'"]1[\'"]\).*?<\/script>/is', '', $html);
+
+            echo $html;
             return;
         }
         $bgColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLBackgroundColor'));
@@ -607,10 +612,13 @@ fetch(url).then(r => r.text()).then(html => {
                     const c = document.getElementById('container');
                     if (c && typeof Highcharts !== 'undefined') {
                         // Speicher freigeben: Alle bestehenden Charts zerstören
-                        while (Highcharts.charts.length > 0) {
-                            if (Highcharts.charts[0]) Highcharts.charts[0].destroy();
-                            Highcharts.charts.shift();
-                        }
+if (Highcharts && Array.isArray(Highcharts.charts)) {
+  for (let i = 0; i < Highcharts.charts.length; i++) {
+    const ch = Highcharts.charts[i];
+    if (ch) ch.destroy();
+  }
+  Highcharts.charts.length = 0;
+}
                         c.innerHTML = html;
                         const s = c.getElementsByTagName('script');
                         for (let i=0; i<s.length; i++) { if(s[i].innerText.includes('initCharts')) eval(s[i].innerText); }
