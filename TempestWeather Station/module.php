@@ -606,7 +606,8 @@ class TempestWeatherStation extends IPSModule
             $lastUpdate = IPS_GetVariable($this->GetIDForIdent('Dashboard'))['VariableUpdated'];
             $nextUpdate = $lastUpdate + $interval;
             $secondsToWait = max(1, ($nextUpdate - time()) + 2);
-            $reloadScript = "<script>setTimeout(function(){ 
+            $reloadScript = "<script>if (window.__tempestTimer) { clearTimeout(window.__tempestTimer); }
+window.__tempestTimer = setTimeout(function(){
                 const url = new URL(window.location.href); url.searchParams.set('ajax', '1');
 fetch(url).then(r => r.text()).then(html => {
                     const c = document.getElementById('container');
