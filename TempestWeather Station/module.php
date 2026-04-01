@@ -1047,6 +1047,9 @@ fetch(url).then(r => r.text()).then(html => {
                 $master[str_replace([' ', '(', ')'], ['_', '', ''], $name)] = $name;
             }
         }
+        // Rapid Wind (kommt nicht aus descriptions[], wird aber als Variable erzeugt)
+        $master['Wind_Speed'] = 'Wind Speed (Rapid)';
+        $master['Wind_Direction_Rapid'] = 'Wind Direction (Rapid)';
         // Device Status
         if (isset($config['descriptions']['device_status'])) {
             foreach ($config['descriptions']['device_status'] as $name) {
