@@ -574,8 +574,12 @@ class TempestWeatherStation extends IPSModule
                         }
 
                         // Special Logic for Wind Barbs (Meteorological Standard)
-                        if ($item['Ident'] === 'Wind_Direction') {
-                            $speedID = @IPS_GetObjectIDByIdent('Wind_Avg', $this->InstanceID);
+                        // Support both: Wind_Direction (uses Wind_Avg) and Wind_Direction_Rapid (uses Wind_Speed)
+                        if ($item['Ident'] === 'Wind_Direction' || $item['Ident'] === 'Wind_Direction_Rapid') {
+
+                            $speedIdent = ($item['Ident'] === 'Wind_Direction_Rapid') ? 'Wind_Speed' : 'Wind_Avg';
+                            $speedID = @IPS_GetObjectIDByIdent($speedIdent, $this->InstanceID);
+
                             if ($speedID && AC_GetLoggingStatus($archiveID, $speedID)) {
                                 $speedHistory = AC_GetLoggedValues($archiveID, $speedID, time() - ($chartTimeframe * 3600), time(), 0);
                                 $speedMap = [];
@@ -594,8 +598,10 @@ class TempestWeatherStation extends IPSModule
                                         $barbPoints[] = "[$ts, $sVal, $dVal]";
                                     }
                                 }
-                                // Fix: Append virtual point at current time to show speed continuing to now
-                                $speedPoints[] = "[" . (time() * 1000) . "," . round($speedHistory[0]['Value'] ?? 0, 2) . "]";
+
+                                // Append virtual point at current time to show speed continuing to now
+                                $lastSpeed = $speedHistory[0]['Value'] ?? 0;
+                                $speedPoints[] = "[" . (time() * 1000) . "," . round($lastSpeed, 2) . "]";
 
                                 $dataString = "{ type: 'area', data: [" . implode(',', $speedPoints) . "], color: '$chartColor', fillOpacity: 0.3, zIndex: 1, tooltip: { pointFormat: '{point.x:%H:%M}: <b>{point.y:.1f} km/h</b>' } }, { type: 'windbarb', data: [" . implode(',', $barbPoints) . "], color: '$fontColor', zIndex: 2, vectorLength: " . ($cHeight * 0.8) . ", yOffset: -" . ($cHeight / 2) . ", xOffset: 10, tooltip: { pointFormat: '{point.x:%H:%M}: <b>{point.direction:.0f}°</b>' } }";
                             }
