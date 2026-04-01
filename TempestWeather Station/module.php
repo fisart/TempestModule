@@ -564,7 +564,13 @@ class TempestWeatherStation extends IPSModule
 
             if (($item['ShowChart'] ?? false) && $archiveReady) {
                 if (AC_GetLoggingStatus($archiveID, $varID)) {
-                    $history = AC_GetLoggedValues($archiveID, $varID, time() - ($chartTimeframe * 3600), time(), 0);
+                    // Option A: Rapid Wind charts only for last 3 hours with higher point cap
+                    $isRapidChart = in_array($item['Ident'], ['Wind_Speed', 'Wind_Direction_Rapid'], true);
+
+                    $tfHours = $isRapidChart ? 3 : $chartTimeframe;     // rapid = 3h, others = configured (e.g. 24h)
+                    $maxPts  = $isRapidChart ? 1200 : 800;              // point caps to prevent PHP OOM
+
+                    $history = AC_GetLoggedValues($archiveID, $varID, time() - ($tfHours * 3600), time(), $maxPts);
                     if (is_array($history) && count($history) > 1) {
                         $points = [];
                         $chartType = 'area';
@@ -581,7 +587,8 @@ class TempestWeatherStation extends IPSModule
                             $speedID = @IPS_GetObjectIDByIdent($speedIdent, $this->InstanceID);
 
                             if ($speedID && AC_GetLoggingStatus($archiveID, $speedID)) {
-                                $speedHistory = AC_GetLoggedValues($archiveID, $speedID, time() - ($chartTimeframe * 3600), time(), 0);
+                                // Use same timeframe + cap as the direction series to keep barb pairing stable
+                                $speedHistory = AC_GetLoggedValues($archiveID, $speedID, time() - ($tfHours * 3600), time(), $maxPts);
                                 $speedMap = [];
                                 foreach ($speedHistory as $sRow) {
                                     $speedMap[$sRow['TimeStamp']] = $sRow['Value'];
