@@ -231,27 +231,70 @@ class TempestWeatherStation extends IPSModule
         $title = $this->ReadPropertyString('StationName');
 
         echo "<!DOCTYPE html>
-<html lang='en'>
-<head>
-    <meta charset='UTF-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
-    <title>$title</title>
-    <link rel='manifest' href='?manifest=1'>
-    <link rel='apple-touch-icon' href='https://tempestwx.com/images/logo.svg'>
-    <meta name='theme-color' content='$bgColor'>
-    <meta name='apple-mobile-web-app-capable' content='yes'>
-    <meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'>
-    <meta name='mobile-web-app-capable' content='yes'>
-    <meta name='apple-mobile-web-app-title' content='Tempest'>
-    <style>
-        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background-color: $bgColor; }
-        #container { width: 100%; height: 100%; }
-    </style>
-</head>
+        <html lang='en'>
+        <head>
+            <meta charset='UTF-8'>
+            <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
+            <title>$title</title>
+            <link rel='manifest' href='?manifest=1'>
+            <link rel='apple-touch-icon' href='https://tempestwx.com/images/logo.svg'>
+            <meta name='theme-color' content='$bgColor'>
+            <meta name='apple-mobile-web-app-capable' content='yes'>
+            <meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'>
+            <meta name='mobile-web-app-capable' content='yes'>
+            <meta name='apple-mobile-web-app-title' content='Tempest'>
+            <style>
+                body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background-color: $bgColor; }
+                #container { width: 100%; height: 100%; }
+            </style>
+        </head>
 <body>
     <div id='container'>
         $dashboardHTML
     </div>
+
+    <script>
+    (function() {
+        // Nur EIN Timer pro Page-Load
+        if (window.__tempestWrapperTimer) {
+            clearTimeout(window.__tempestWrapperTimer);
+        }
+
+        var intervalSec = " . (int)$this->ReadPropertyInteger('HTMLUpdateInterval') . ";
+        if (!intervalSec || intervalSec <= 0) return;
+
+        function refreshOnce() {
+            var url = new URL(window.location.href);
+            url.searchParams.set('ajax', '1');
+
+            fetch(url.toString(), { cache: 'no-store' })
+                .then(function(r){ return r.text(); })
+                .then(function(html){
+                    var c = document.getElementById('container');
+                    if (!c) return;
+
+                    // Container ersetzen
+                    c.innerHTML = html;
+
+                    // initCharts aus dem neuen HTML starten (wie bisher)
+                    var s = c.getElementsByTagName('script');
+                    for (var i=0; i<s.length; i++) {
+                        if (s[i].innerText && s[i].innerText.indexOf('initCharts') !== -1) {
+                            eval(s[i].innerText);
+                        }
+                    }
+                })
+                .finally(function(){
+                    // Nächsten Tick planen
+                    window.__tempestWrapperTimer = setTimeout(refreshOnce, intervalSec * 1000);
+                });
+        }
+
+        // Start
+        window.__tempestWrapperTimer = setTimeout(refreshOnce, intervalSec * 1000);
+    })();
+    </script>
+
 </body>
 </html>";
     }
@@ -642,7 +685,6 @@ fetch(url).then(r => r.text()).then(html => {
                     initCharts();
                 })();
             </script>
-            $reloadScript
         </div>";
 
         $this->SetValue('Dashboard', $html);
