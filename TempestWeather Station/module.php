@@ -248,55 +248,66 @@ class TempestWeatherStation extends IPSModule
                 #container { width: 100%; height: 100%; }
             </style>
         </head>
-<body>
-    <div id='container'>
-        $dashboardHTML
-    </div>
+        <body>
+            <div id='container'>
+                $dashboardHTML
+            </div>
 
-    <script>
-    (function() {
-        // Nur EIN Timer pro Page-Load
-        if (window.__tempestWrapperTimer) {
-            clearTimeout(window.__tempestWrapperTimer);
+            <script>
+            (function() {
+                // Nur EIN Timer pro Page-Load
+                if (window.__tempestWrapperTimer) {
+                    clearTimeout(window.__tempestWrapperTimer);
+                }
+
+                var intervalSec = " . (int)$this->ReadPropertyInteger('HTMLUpdateInterval') . ";
+                if (!intervalSec || intervalSec <= 0) return;
+
+                function refreshOnce() {
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('ajax', '1');
+
+                    fetch(url.toString(), { cache: 'no-store' })
+                        .then(function(r){ return r.text(); })
+                        .then(function(html){
+                            var c = document.getElementById('container');
+                            if (!c) return;
+
+// Alte Highcharts sauber zerstören, bevor wir den Container ersetzen
+if (typeof Highcharts !== 'undefined' && Highcharts.charts && Highcharts.charts.length) {
+    for (var j = 0; j < Highcharts.charts.length; j++) {
+        if (Highcharts.charts[j]) {
+            try { Highcharts.charts[j].destroy(); } catch (e) {}
         }
+    }
+    Highcharts.charts.length = 0;
+}
 
-        var intervalSec = " . (int)$this->ReadPropertyInteger('HTMLUpdateInterval') . ";
-        if (!intervalSec || intervalSec <= 0) return;
+// Container ersetzen
+c.innerHTML = html;
 
-        function refreshOnce() {
-            var url = new URL(window.location.href);
-            url.searchParams.set('ajax', '1');
+// initCharts aus dem neuen HTML starten (wie bisher)
+var s = c.getElementsByTagName('script');
+...
+                            for (var i=0; i<s.length; i++) {
+                                if (s[i].innerText && s[i].innerText.indexOf('initCharts') !== -1) {
+                                    eval(s[i].innerText);
+                                }
+                            }
+                        })
+                        .finally(function(){
+                            // Nächsten Tick planen
+                            window.__tempestWrapperTimer = setTimeout(refreshOnce, intervalSec * 1000);
+                        });
+                }
 
-            fetch(url.toString(), { cache: 'no-store' })
-                .then(function(r){ return r.text(); })
-                .then(function(html){
-                    var c = document.getElementById('container');
-                    if (!c) return;
+                // Start
+                window.__tempestWrapperTimer = setTimeout(refreshOnce, intervalSec * 1000);
+            })();
+            </script>
 
-                    // Container ersetzen
-                    c.innerHTML = html;
-
-                    // initCharts aus dem neuen HTML starten (wie bisher)
-                    var s = c.getElementsByTagName('script');
-                    for (var i=0; i<s.length; i++) {
-                        if (s[i].innerText && s[i].innerText.indexOf('initCharts') !== -1) {
-                            eval(s[i].innerText);
-                        }
-                    }
-                })
-                .finally(function(){
-                    // Nächsten Tick planen
-                    window.__tempestWrapperTimer = setTimeout(refreshOnce, intervalSec * 1000);
-                });
-        }
-
-        // Start
-        window.__tempestWrapperTimer = setTimeout(refreshOnce, intervalSec * 1000);
-    })();
-    </script>
-
-</body>
-</html>";
+        </body>
+        </html>";
     }
 
 
