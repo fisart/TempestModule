@@ -273,16 +273,26 @@ class TempestWeatherStation extends IPSModule
                             var c = document.getElementById('container');
                             if (!c) return;
 
-                            // Container ersetzen
-                            c.innerHTML = html;
+// Alte Highcharts sauber zerstören, bevor wir den Container ersetzen
+if (typeof Highcharts !== 'undefined' && Highcharts.charts && Highcharts.charts.length) {
+    for (var j = 0; j < Highcharts.charts.length; j++) {
+        if (Highcharts.charts[j]) {
+            try { Highcharts.charts[j].destroy(); } catch (e) {}
+        }
+    }
+    Highcharts.charts.length = 0;
+}
 
-                            // initCharts aus dem neuen HTML starten (wie bisher)
-                            var s = c.getElementsByTagName('script');
-                            for (var i=0; i<s.length; i++) {
-                                if (s[i].innerText && s[i].innerText.indexOf('initCharts') !== -1) {
-                                    eval(s[i].innerText);
-                                }
-                            }
+// Container ersetzen
+c.innerHTML = html;
+
+// initCharts aus dem neuen HTML starten (wie bisher)
+var s = c.getElementsByTagName('script');
+for (var i=0; i<s.length; i++) {
+    if (s[i].innerText && s[i].innerText.indexOf('initCharts') !== -1) {
+        eval(s[i].innerText);
+    }
+}
                         })
                         .finally(function(){
                             // Nächsten Tick planen
