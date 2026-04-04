@@ -353,6 +353,7 @@ class TempestWeatherStation extends IPSModule
         }
 
         $check = $this->CheckTimestamp('Time_Epoch', $timestamp);
+        $this->LogMessage("OBS_ST timestamp=$timestamp CheckTimestamp=$check", KL_MESSAGE);
         if ($check === 'INVALID') return;
 
         $config = $this->GetModuleConfig();
