@@ -877,7 +877,11 @@ fetch(url).then(r => r.text()).then(html => {
         if ($archiveID === 0 || !IPS_InstanceExists($archiveID)) return 'NEW_VALUE';
 
         if (!AC_GetLoggingStatus($archiveID, $varID)) return 'NEW_VALUE';
-        if ($timestamp > time()) return 'INVALID';
+        $now = time();
+
+        // Allow small clock skew between station and server (otherwise obs_st can freeze completely)
+        $maxFutureSkewSec = 300; // 5 minutes tolerance
+        if ($timestamp > ($now + $maxFutureSkewSec)) return 'INVALID';
 
         $lastValues = AC_GetLoggedValues($archiveID, $varID, $timestamp - 1, $timestamp + 1, 1);
         if (!empty($lastValues) && $lastValues[0]['Value'] == $timestamp) return 'INVALID';
