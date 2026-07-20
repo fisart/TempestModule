@@ -585,7 +585,7 @@ class TempestWeatherStation extends IPSModule
                     if (is_array($history) && count($history) > 1) {
                         $points = [];
                         $chartType = 'area';
-
+                        $dataString = null;
                         if (in_array($item['Ident'], ['Precip_Accumulated', 'Lightning_Strike_Count'])) {
                             $chartType = 'column';
                         }
@@ -717,18 +717,50 @@ class TempestWeatherStation extends IPSModule
                             $dataString = "{ type: '$chartType', data: [" . implode(',', $points) . "], color: '$chartColor' }";
                         }
 
-                        $chartID = "chart_" . $item['Ident'];
-                        $chartHtml = "<div id='$chartID' style='width: 100%; height: {$cHeight}px; margin-top: 5px;'></div>";
 
-                        $chartScripts .= "
-                        Highcharts.chart('$chartID', {
-                            chart: { margin: [2, 5, 2, 5], backgroundColor: null, height: $cHeight, skipClone: true },
-                            title: { text: null }, credits: { enabled: false }, legend: { enabled: false }, accessibility: { enabled: false },
-                            xAxis: { visible: false, type: 'datetime' }, yAxis: { visible: false },
-                            tooltip: { enabled: true, headerFormat: '', pointFormat: '{point.x:%H:%M}: <b>{point.y}</b>', outside: true },
-                            plotOptions: { series: { marker: { enabled: false }, lineWidth: 1, animation: false }, area: { fillOpacity: 0.1, threshold: null }, column: { borderWidth: 0, color: '$chartColor', pointPadding: 0.1 } },
-                            series: [$dataString]
-                        });";
+                        if ($dataString !== null) {
+                            $chartID = "chart_" . $item['Ident'];
+                            $chartHtml = "<div id='$chartID' style='width: 100%; height: {$cHeight}px; margin-top: 5px;'></div>";
+
+                            $chartScripts .= "
+    Highcharts.chart('$chartID', {
+        chart: {
+            margin: [2, 5, 2, 5],
+            backgroundColor: null,
+            height: $cHeight,
+            skipClone: true
+        },
+        title: { text: null },
+        credits: { enabled: false },
+        legend: { enabled: false },
+        accessibility: { enabled: false },
+        xAxis: { visible: false, type: 'datetime' },
+        yAxis: { visible: false },
+        tooltip: {
+            enabled: true,
+            headerFormat: '',
+            pointFormat: '{point.x:%H:%M}: <b>{point.y}</b>',
+            outside: true
+        },
+        plotOptions: {
+            series: {
+                marker: { enabled: false },
+                lineWidth: 1,
+                animation: false
+            },
+            area: {
+                fillOpacity: 0.1,
+                threshold: null
+            },
+            column: {
+                borderWidth: 0,
+                color: '$chartColor',
+                pointPadding: 0.1
+            }
+        },
+        series: [$dataString]
+    });";
+                        }
                     }
                 } else {
                     $chartHtml = "<div style='font-size: 8px; opacity: 0.5; margin-top: 5px;'>(Logging Off)</div>";
