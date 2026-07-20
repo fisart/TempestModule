@@ -521,84 +521,269 @@ class TempestWeatherStation extends IPSModule
 
     private function GenerateHTMLDashboard()
     {
-        if (!$this->ReadPropertyBoolean('EnableHTML')) return;
+        if (!$this->ReadPropertyBoolean('EnableHTML')) {
+            return;
+        }
 
         $stationName = $this->ReadPropertyString('StationName');
-        $bgColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLBackgroundColor'));
-        $fontColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLFontColor'));
-        $varList = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
-        $interval = $this->ReadPropertyInteger('HTMLUpdateInterval');
+        $bgColor = sprintf(
+            '#%06X',
+            $this->ReadPropertyInteger('HTMLBackgroundColor')
+        );
+        $fontColor = sprintf(
+            '#%06X',
+            $this->ReadPropertyInteger('HTMLFontColor')
+        );
+
+        $varList = json_decode(
+            $this->ReadPropertyString('HTMLVariableList'),
+            true
+        ) ?: [];
+
         $chartTimeframe = $this->ReadPropertyInteger('ChartTimeframe');
-        $chartColor = sprintf("#%06X", $this->ReadPropertyInteger('ChartColor'));
+        $chartColor = sprintf(
+            '#%06X',
+            $this->ReadPropertyInteger('ChartColor')
+        );
         $cHeight = $this->ReadPropertyInteger('HTMLChartHeight');
         $valFontSize = $this->ReadPropertyFloat('HTMLFontSizeValue');
 
-        // Fix: Calculate Timezone Offset and Localized Header Time
-        $tz = new DateTimeZone($this->ReadPropertyString('HTMLTimezone'));
-        $tzOffset = ($tz->getOffset(new DateTime('now', $tz)) / 60) * -1;
-        $timeID = @IPS_GetObjectIDByIdent('Time_Epoch', $this->InstanceID);
-        $timeStr = ($timeID !== 0 && IPS_VariableExists($timeID)) ? (new DateTime('@' . GetValue($timeID)))->setTimezone($tz)->format('H:i:s') : '--:--:--';
+        /*
+     * Converts PHP numeric values into valid JavaScript numbers.
+     * Decimal points are always periods, independent of PHP locale.
+     */
+        $jsNumber = static function ($value, int $decimals = 6): string {
+            if (!is_numeric($value)) {
+                return '0';
+            }
 
-        $sysCondID = @IPS_GetObjectIDByIdent('System_Condition', $this->InstanceID);
-        $sysCondStr = ($sysCondID !== 0 && IPS_VariableExists($sysCondID)) ? GetValueFormatted($sysCondID) : '';
+            $formatted = number_format(
+                (float)$value,
+                $decimals,
+                '.',
+                ''
+            );
 
+            $formatted = rtrim(
+                rtrim($formatted, '0'),
+                '.'
+            );
+
+            if ($formatted === '' || $formatted === '-0') {
+                return '0';
+            }
+
+            return $formatted;
+        };
+
+        /*
+     * Timezone and dashboard header time.
+     */
+        try {
+            $tz = new DateTimeZone(
+                $this->ReadPropertyString('HTMLTimezone')
+            );
+        } catch (Exception $e) {
+            $tz = new DateTimeZone('UTC');
+        }
+
+        $tzOffset = (
+            $tz->getOffset(new DateTime('now', $tz)) / 60
+        ) * -1;
+
+        $timeID = @IPS_GetObjectIDByIdent(
+            'Time_Epoch',
+            $this->InstanceID
+        );
+
+        $timeStr = '--:--:--';
+
+        if (
+            $timeID !== 0
+            && IPS_VariableExists($timeID)
+        ) {
+            $timeStr = (new DateTime(
+                '@' . GetValue($timeID)
+            ))
+                ->setTimezone($tz)
+                ->format('H:i:s');
+        }
+
+        $sysCondID = @IPS_GetObjectIDByIdent(
+            'System_Condition',
+            $this->InstanceID
+        );
+
+        $sysCondStr = '';
+
+        if (
+            $sysCondID !== 0
+            && IPS_VariableExists($sysCondID)
+        ) {
+            $sysCondStr = GetValueFormatted($sysCondID);
+        }
+
+        /*
+     * Archive configuration.
+     */
         $archiveID = $this->ReadPropertyInteger('ArchiveID');
-        $archiveReady = ($archiveID > 0 && IPS_InstanceExists($archiveID));
 
-        $itemsHtml = "";
-        $chartScripts = "";
+        $archiveReady = (
+            $archiveID > 0
+            && IPS_InstanceExists($archiveID)
+        );
+
+        $itemsHtml = '';
+        $chartScripts = '';
 
         foreach ($varList as $item) {
-            if (!isset($item['Ident']) || !($item['Show'] ?? false)) continue;
+            if (
+                !isset($item['Ident'])
+                || !($item['Show'] ?? false)
+            ) {
+                continue;
+            }
 
-            $varID = @IPS_GetObjectIDByIdent($item['Ident'], $this->InstanceID);
+            $ident = (string)$item['Ident'];
 
+            /*
+         * Locate the variable directly below the module.
+         */
+            $varID = @IPS_GetObjectIDByIdent(
+                $ident,
+                $this->InstanceID
+            );
+
+            /*
+         * Fallback: Search one category level below the module.
+         */
             if ($varID === 0) {
-                $children = IPS_GetChildrenIDs($this->InstanceID);
+                $children = IPS_GetChildrenIDs(
+                    $this->InstanceID
+                );
+
                 foreach ($children as $child) {
-                    if (IPS_GetObject($child)['ObjectType'] === 0) {
-                        $subID = @IPS_GetObjectIDByIdent($item['Ident'], $child);
-                        if ($subID !== 0) {
-                            $varID = $subID;
-                            break;
-                        }
+                    $object = IPS_GetObject($child);
+
+                    if ($object['ObjectType'] !== 0) {
+                        continue;
+                    }
+
+                    $subID = @IPS_GetObjectIDByIdent(
+                        $ident,
+                        $child
+                    );
+
+                    if ($subID !== 0) {
+                        $varID = $subID;
+                        break;
                     }
                 }
             }
 
-            if ($varID === 0 || !IPS_VariableExists($varID)) continue;
+            if (
+                $varID === 0
+                || !IPS_VariableExists($varID)
+            ) {
+                continue;
+            }
 
             $formatted = GetValueFormatted($varID);
-            // Fix: Use actual variable name from object tree to support localization
             $label = IPS_GetName($varID);
-            $chartHtml = "";
+            $chartHtml = '';
 
-            if (($item['ShowChart'] ?? false) && $archiveReady) {
+            /*
+         * Create chart when enabled and archive logging is available.
+         */
+            if (
+                ($item['ShowChart'] ?? false)
+                && $archiveReady
+            ) {
                 if (AC_GetLoggingStatus($archiveID, $varID)) {
-                    // Option A: Rapid Wind charts only for last 3 hours with higher point cap
-                    $isRapidChart = in_array($item['Ident'], ['Wind_Speed', 'Wind_Direction_Rapid'], true);
+                    /*
+                 * Rapid Wind:
+                 * - last 3 hours
+                 * - up to 1200 archive records
+                 *
+                 * Other charts:
+                 * - configured timeframe
+                 * - up to 800 records
+                 */
+                    $isRapidChart = in_array(
+                        $ident,
+                        [
+                            'Wind_Speed',
+                            'Wind_Direction_Rapid'
+                        ],
+                        true
+                    );
 
-                    $tfHours = $isRapidChart ? 3 : $chartTimeframe;     // rapid = 3h, others = configured (e.g. 24h)
-                    $maxPts  = $isRapidChart ? 1200 : 800;              // point caps to prevent PHP OOM
+                    $tfHours = $isRapidChart
+                        ? 3
+                        : $chartTimeframe;
 
-                    $history = AC_GetLoggedValues($archiveID, $varID, time() - ($tfHours * 3600), time(), $maxPts);
-                    if (is_array($history) && count($history) > 1) {
+                    $maxPts = $isRapidChart
+                        ? 1200
+                        : 800;
+
+                    $history = AC_GetLoggedValues(
+                        $archiveID,
+                        $varID,
+                        time() - ($tfHours * 3600),
+                        time(),
+                        $maxPts
+                    );
+
+                    if (
+                        is_array($history)
+                        && count($history) > 1
+                    ) {
                         $points = [];
                         $chartType = 'area';
                         $dataString = null;
-                        if (in_array($item['Ident'], ['Precip_Accumulated', 'Lightning_Strike_Count'])) {
+
+                        if (
+                            in_array(
+                                $ident,
+                                [
+                                    'Precip_Accumulated',
+                                    'Lightning_Strike_Count'
+                                ],
+                                true
+                            )
+                        ) {
                             $chartType = 'column';
                         }
 
-                        // Special Logic for Wind Barbs (Meteorological Standard)
-                        // Support both: Wind_Direction (uses Wind_Avg) and Wind_Direction_Rapid (uses Wind_Speed)
-                        if ($item['Ident'] === 'Wind_Direction' || $item['Ident'] === 'Wind_Direction_Rapid') {
+                        /*
+                     * WIND DIRECTION CHART
+                     *
+                     * Wind_Direction_Rapid uses Wind_Speed.
+                     * Wind_Direction uses Wind_Avg.
+                     */
+                        if (
+                            $ident === 'Wind_Direction'
+                            || $ident === 'Wind_Direction_Rapid'
+                        ) {
+                            $speedIdent = (
+                                $ident === 'Wind_Direction_Rapid'
+                            )
+                                ? 'Wind_Speed'
+                                : 'Wind_Avg';
 
-                            $speedIdent = ($item['Ident'] === 'Wind_Direction_Rapid') ? 'Wind_Speed' : 'Wind_Avg';
-                            $speedID = @IPS_GetObjectIDByIdent($speedIdent, $this->InstanceID);
+                            $speedID = @IPS_GetObjectIDByIdent(
+                                $speedIdent,
+                                $this->InstanceID
+                            );
 
-                            if ($speedID && AC_GetLoggingStatus($archiveID, $speedID)) {
-                                // Use same timeframe + cap as the direction series to keep barb pairing stable
+                            if (
+                                $speedID !== 0
+                                && IPS_VariableExists($speedID)
+                                && AC_GetLoggingStatus(
+                                    $archiveID,
+                                    $speedID
+                                )
+                            ) {
                                 $speedHistory = AC_GetLoggedValues(
                                     $archiveID,
                                     $speedID,
@@ -607,50 +792,96 @@ class TempestWeatherStation extends IPSModule
                                     $maxPts
                                 );
 
-                                if (is_array($speedHistory) && count($speedHistory) > 1) {
+                                if (
+                                    is_array($speedHistory)
+                                    && count($speedHistory) > 1
+                                ) {
+                                    /*
+                                 * AC_GetLoggedValues normally returns
+                                 * newest values first. Highcharts requires
+                                 * chronological order.
+                                 */
+                                    $directionRows = array_reverse(
+                                        $history
+                                    );
 
-                                    // AC_GetLoggedValues liefert normalerweise neueste Werte zuerst.
-                                    // Für die Diagrammerzeugung chronologisch sortieren.
-                                    $directionRows = array_reverse($history);
-                                    $speedRows = array_reverse($speedHistory);
+                                    $speedRows = array_reverse(
+                                        $speedHistory
+                                    );
 
                                     /*
-     * Geschwindigkeitskurve unabhängig von der Windrichtung aufbauen.
-     * Dadurch gehen keine Geschwindigkeitswerte verloren.
-     */
+                                 * Build the complete wind-speed area curve
+                                 * independently from the direction values.
+                                 */
                                     $speedPoints = [];
 
-                                    foreach ($speedRows as $sRow) {
-                                        $ts = (int)$sRow['TimeStamp'] * 1000;
-                                        $speedKmh = round((float)$sRow['Value'], 2);
+                                    foreach ($speedRows as $speedRow) {
+                                        $timestampMs = (
+                                            (int)$speedRow['TimeStamp']
+                                        ) * 1000;
 
-                                        $speedPoints[] = "[$ts,$speedKmh]";
+                                        $speedKmh = $jsNumber(
+                                            $speedRow['Value'],
+                                            2
+                                        );
+
+                                        $speedPoints[] =
+                                            '['
+                                            . $timestampMs
+                                            . ','
+                                            . $speedKmh
+                                            . ']';
                                     }
 
-                                    // Kurve bis zum aktuellen Zeitpunkt verlängern.
-                                    $latestSpeedKmh = round((float)($speedHistory[0]['Value'] ?? 0), 2);
-                                    $speedPoints[] = "[" . (time() * 1000) . ",$latestSpeedKmh]";
+                                    /*
+                                 * Extend the speed curve to the current
+                                 * dashboard-generation time.
+                                 */
+                                    $latestSpeedKmh = $jsNumber(
+                                        $speedHistory[0]['Value'] ?? 0,
+                                        2
+                                    );
+
+                                    $speedPoints[] =
+                                        '['
+                                        . (time() * 1000)
+                                        . ','
+                                        . $latestSpeedKmh
+                                        . ']';
 
                                     /*
-     * Richtung mit dem zeitlich nächstgelegenen Geschwindigkeitswert
-     * verbinden, statt sekundengenaue Gleichheit zu verlangen.
-     */
-                                    $barbPoints = [];
+                                 * Match each direction record to the
+                                 * nearest speed record.
+                                 */
+                                    $barbData = [];
                                     $speedIndex = 0;
                                     $speedCount = count($speedRows);
 
-                                    // Rapid Wind kommt häufiger als obs_st.
-                                    $maximumTimeDifference = $isRapidChart ? 2 : 5;
+                                    /*
+                                 * Rapid Wind records should normally match
+                                 * exactly. Two seconds allows minor archive
+                                 * timing differences.
+                                 *
+                                 * Observation wind allows five seconds.
+                                 */
+                                    $maximumTimeDifference = $isRapidChart
+                                        ? 2
+                                        : 5;
 
-                                    foreach ($directionRows as $directionRow) {
-                                        $directionTimestamp = (int)$directionRow['TimeStamp'];
+                                    foreach (
+                                        $directionRows as $directionRow
+                                    ) {
+                                        $directionTimestamp = (int)
+                                        $directionRow['TimeStamp'];
 
                                         /*
-         * Zum zeitlich nächstgelegenen Geschwindigkeitswert vorlaufen.
-         */
+                                     * Move forward while the next speed
+                                     * record is closer to the direction
+                                     * timestamp than the current record.
+                                     */
                                         while (
-                                            ($speedIndex + 1) < $speedCount &&
-                                            abs(
+                                            ($speedIndex + 1) < $speedCount
+                                            && abs(
                                                 (int)$speedRows[$speedIndex + 1]['TimeStamp']
                                                     - $directionTimestamp
                                             ) <= abs(
@@ -661,170 +892,496 @@ class TempestWeatherStation extends IPSModule
                                             $speedIndex++;
                                         }
 
-                                        $speedTimestamp = (int)$speedRows[$speedIndex]['TimeStamp'];
-                                        $timeDifference = abs($speedTimestamp - $directionTimestamp);
+                                        $speedTimestamp = (int)
+                                        $speedRows[$speedIndex]['TimeStamp'];
 
-                                        if ($timeDifference > $maximumTimeDifference) {
+                                        $timeDifference = abs(
+                                            $speedTimestamp
+                                                - $directionTimestamp
+                                        );
+
+                                        if (
+                                            $timeDifference
+                                            > $maximumTimeDifference
+                                        ) {
                                             continue;
                                         }
 
-                                        $speedKmh = (float)$speedRows[$speedIndex]['Value'];
+                                        $speedKmh = (float)
+                                        $speedRows[$speedIndex]['Value'];
 
                                         /*
-         * Highcharts erwartet für Windbarbs die Geschwindigkeit in m/s.
-         * Die Flächenkurve bleibt weiterhin in km/h.
-         */
-                                        $speedMs = round($speedKmh / 3.6, 2);
-                                        $direction = round((float)$directionRow['Value'], 2);
-                                        $ts = $directionTimestamp * 1000;
+                                     * Highcharts windbarbs require m/s.
+                                     */
+                                        $speedMs = $speedKmh / 3.6;
 
-                                        $barbPoints[] = "[$ts,$speedMs,$direction]";
+                                        $direction = (float)
+                                        $directionRow['Value'];
+
+                                        /*
+                                     * Ignore invalid archive values.
+                                     */
+                                        if (
+                                            $direction < 0
+                                            || $direction > 360
+                                        ) {
+                                            continue;
+                                        }
+
+                                        $barbData[] = [
+                                            'timestamp' =>
+                                            $directionTimestamp * 1000,
+                                            'speed' => $speedMs,
+                                            'direction' => $direction
+                                        ];
                                     }
 
+                                    /*
+                                 * Hundreds of arrows cannot be displayed
+                                 * meaningfully in a small dashboard graph.
+                                 * Reduce them to approximately 36 arrows.
+                                 */
+                                    $maximumBarbs = 36;
+
+                                    if (
+                                        count($barbData)
+                                        > $maximumBarbs
+                                    ) {
+                                        $step = max(
+                                            1,
+                                            (int)ceil(
+                                                count($barbData)
+                                                    / $maximumBarbs
+                                            )
+                                        );
+
+                                        $sampledBarbs = [];
+
+                                        foreach (
+                                            $barbData as
+                                            $barbIndex => $barb
+                                        ) {
+                                            if (
+                                                ($barbIndex % $step) === 0
+                                            ) {
+                                                $sampledBarbs[] = $barb;
+                                            }
+                                        }
+
+                                        /*
+                                     * Always retain the newest direction.
+                                     */
+                                        $lastBarb = $barbData[array_key_last($barbData)];
+
+                                        if (
+                                            empty($sampledBarbs)
+                                            || $sampledBarbs[array_key_last(
+                                                    $sampledBarbs
+                                                )]['timestamp']
+                                            !== $lastBarb['timestamp']
+                                        ) {
+                                            $sampledBarbs[] = $lastBarb;
+                                        }
+
+                                        $barbData = $sampledBarbs;
+                                    }
+
+                                    /*
+                                 * Convert the selected barb records into
+                                 * valid JavaScript arrays:
+                                 *
+                                 * [timestamp, speed m/s, direction degrees]
+                                 */
+                                    $barbPoints = [];
+
+                                    foreach ($barbData as $barb) {
+                                        $barbPoints[] =
+                                            '['
+                                            . (int)$barb['timestamp']
+                                            . ','
+                                            . $jsNumber(
+                                                $barb['speed'],
+                                                2
+                                            )
+                                            . ','
+                                            . $jsNumber(
+                                                $barb['direction'],
+                                                2
+                                            )
+                                            . ']';
+                                    }
+
+                                    /*
+                                 * Highcharts series ID used by onSeries.
+                                 */
+                                    $speedSeriesID =
+                                        'wind-speed-'
+                                        . preg_replace(
+                                            '/[^A-Za-z0-9_-]/',
+                                            '_',
+                                            $ident
+                                        );
+
+                                    /*
+                                 * Smaller vectors are more suitable for
+                                 * the compact dashboard chart.
+                                 */
+                                    $vectorLength = max(
+                                        14,
+                                        min(
+                                            28,
+                                            (int)round(
+                                                $cHeight * 0.35
+                                            )
+                                        )
+                                    );
+
+                                    $windYOffset = -max(
+                                        4,
+                                        (int)round(
+                                            $cHeight * 0.12
+                                        )
+                                    );
+
+                                    /*
+                                 * Area series.
+                                 */
                                     $dataString =
-                                        "{"
+                                        '{'
                                         . "type: 'area',"
-                                        . "data: [" . implode(',', $speedPoints) . "],"
+                                        . "id: '$speedSeriesID',"
+                                        . 'data: ['
+                                        . implode(',', $speedPoints)
+                                        . '],'
                                         . "color: '$chartColor',"
-                                        . "fillOpacity: 0.3,"
-                                        . "zIndex: 1,"
-                                        . "tooltip: {"
-                                        . "pointFormat: '{point.x:%H:%M}: <b>{point.y:.1f} km/h</b>'"
-                                        . "}"
-                                        . "},"
-                                        . "{"
-                                        . "type: 'windbarb',"
-                                        . "data: [" . implode(',', $barbPoints) . "],"
-                                        . "color: '$fontColor',"
-                                        . "zIndex: 2,"
-                                        . "vectorLength: " . ($cHeight * 0.8) . ","
-                                        . "yOffset: -" . ($cHeight / 2) . ","
-                                        . "xOffset: 10,"
-                                        . "tooltip: {"
-                                        . "pointFormat: '{point.x:%H:%M}: <b>{point.direction:.0f}°</b>'"
-                                        . "}"
-                                        . "}";
+                                        . 'fillOpacity: 0.3,'
+                                        . 'zIndex: 1,'
+                                        . 'tooltip: {'
+                                        . "pointFormat: "
+                                        . "'{point.x:%H:%M}: "
+                                        . "<b>{point.y:.1f} km/h</b>'"
+                                        . '}'
+                                        . '}';
+
+                                    /*
+                                 * Add the wind-barb series only when valid
+                                 * direction records are available.
+                                 */
+                                    if (!empty($barbPoints)) {
+                                        $dataString .=
+                                            ',{'
+                                            . "type: 'windbarb',"
+                                            . 'data: ['
+                                            . implode(',', $barbPoints)
+                                            . '],'
+                                            . "onSeries: '$speedSeriesID',"
+                                            . 'dataGrouping: {'
+                                            . 'enabled: false'
+                                            . '},'
+                                            . "color: '$fontColor',"
+                                            . 'zIndex: 2,'
+                                            . 'clip: false,'
+                                            . 'vectorLength: '
+                                            . $vectorLength
+                                            . ','
+                                            . 'yOffset: '
+                                            . $windYOffset
+                                            . ','
+                                            . 'xOffset: 0,'
+                                            . 'tooltip: {'
+                                            . "pointFormat: "
+                                            . "'{point.x:%H:%M}: "
+                                            . "<b>{point.direction:.0f}°</b>, "
+                                            . "{point.value:.1f} m/s'"
+                                            . '}'
+                                            . '}';
+                                    }
                                 }
                             }
                         } else {
-                            foreach (array_reverse($history) as $row) {
-                                $points[] = "[" . ($row['TimeStamp'] * 1000) . "," . round($row['Value'], 2) . "]";
-                            }
-                            // Fix: Append virtual point at current time using the latest value
-                            $points[] = "[" . (time() * 1000) . "," . round($history[0]['Value'], 2) . "]";
+                            /*
+                         * Normal chart series.
+                         */
+                            foreach (
+                                array_reverse($history) as $row
+                            ) {
+                                $timestampMs = (
+                                    (int)$row['TimeStamp']
+                                ) * 1000;
 
-                            // Fix: Use dynamic $chartType variable instead of hardcoded 'area'
-                            $dataString = "{ type: '$chartType', data: [" . implode(',', $points) . "], color: '$chartColor' }";
+                                $value = $jsNumber(
+                                    $row['Value'],
+                                    6
+                                );
+
+                                $points[] =
+                                    '['
+                                    . $timestampMs
+                                    . ','
+                                    . $value
+                                    . ']';
+                            }
+
+                            /*
+                         * Extend ordinary charts to the current time
+                         * using the latest archive value.
+                         */
+                            $latestValue = $jsNumber(
+                                $history[0]['Value'],
+                                6
+                            );
+
+                            $points[] =
+                                '['
+                                . (time() * 1000)
+                                . ','
+                                . $latestValue
+                                . ']';
+
+                            $dataString =
+                                '{'
+                                . "type: '$chartType',"
+                                . 'data: ['
+                                . implode(',', $points)
+                                . '],'
+                                . "color: '$chartColor'"
+                                . '}';
                         }
 
-
+                        /*
+                     * Only create a Highcharts chart when a valid series
+                     * definition was generated.
+                     */
                         if ($dataString !== null) {
-                            $chartID = "chart_" . $item['Ident'];
-                            $chartHtml = "<div id='$chartID' style='width: 100%; height: {$cHeight}px; margin-top: 5px;'></div>";
+                            $chartID =
+                                'chart_'
+                                . preg_replace(
+                                    '/[^A-Za-z0-9_-]/',
+                                    '_',
+                                    $ident
+                                );
+
+                            $chartHtml =
+                                "<div id='$chartID' "
+                                . "style='width: 100%; "
+                                . "height: {$cHeight}px; "
+                                . "margin-top: 5px;'>"
+                                . '</div>';
 
                             $chartScripts .= "
-    Highcharts.chart('$chartID', {
-        chart: {
-            margin: [2, 5, 2, 5],
-            backgroundColor: null,
-            height: $cHeight,
-            skipClone: true
-        },
-        title: { text: null },
-        credits: { enabled: false },
-        legend: { enabled: false },
-        accessibility: { enabled: false },
-        xAxis: { visible: false, type: 'datetime' },
-        yAxis: { visible: false },
-        tooltip: {
-            enabled: true,
-            headerFormat: '',
-            pointFormat: '{point.x:%H:%M}: <b>{point.y}</b>',
-            outside: true
-        },
-        plotOptions: {
-            series: {
-                marker: { enabled: false },
-                lineWidth: 1,
-                animation: false
-            },
-            area: {
-                fillOpacity: 0.1,
-                threshold: null
-            },
-            column: {
-                borderWidth: 0,
-                color: '$chartColor',
-                pointPadding: 0.1
-            }
-        },
-        series: [$dataString]
-    });";
+                            Highcharts.chart('$chartID', {
+                                chart: {
+                                    margin: [2, 5, 2, 5],
+                                    backgroundColor: null,
+                                    height: $cHeight,
+                                    skipClone: true
+                                },
+                                title: {
+                                    text: null
+                                },
+                                credits: {
+                                    enabled: false
+                                },
+                                legend: {
+                                    enabled: false
+                                },
+                                accessibility: {
+                                    enabled: false
+                                },
+                                xAxis: {
+                                    visible: false,
+                                    type: 'datetime'
+                                },
+                                yAxis: {
+                                    visible: false
+                                },
+                                tooltip: {
+                                    enabled: true,
+                                    headerFormat: '',
+                                    pointFormat:
+                                        '{point.x:%H:%M}: <b>{point.y}</b>',
+                                    outside: true
+                                },
+                                plotOptions: {
+                                    series: {
+                                        marker: {
+                                            enabled: false
+                                        },
+                                        lineWidth: 1,
+                                        animation: false
+                                    },
+                                    area: {
+                                        fillOpacity: 0.1,
+                                        threshold: null
+                                    },
+                                    column: {
+                                        borderWidth: 0,
+                                        color: '$chartColor',
+                                        pointPadding: 0.1
+                                    },
+                                    windbarb: {
+                                        animation: false,
+                                        dataGrouping: {
+                                            enabled: false
+                                        }
+                                    }
+                                },
+                                series: [$dataString]
+                            });
+                        ";
                         }
                     }
                 } else {
-                    $chartHtml = "<div style='font-size: 8px; opacity: 0.5; margin-top: 5px;'>(Logging Off)</div>";
+                    $chartHtml =
+                        "<div style='font-size: 8px; "
+                        . "opacity: 0.5; "
+                        . "margin-top: 5px;'>"
+                        . '(Logging Off)'
+                        . '</div>';
                 }
             }
 
+            $row = (int)($item['Row'] ?? 1);
+            $col = (int)($item['Col'] ?? 1);
+
             $itemsHtml .= "
-            <div style='grid-area: {$item['Row']} / {$item['Col']}; border: 1px solid rgba(255,255,255,0.1); padding: 1cqi; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 4px; overflow: hidden;'>
-                <div style='font-size: clamp(8px, 2.2cqi, 18px); opacity: 0.7; white-space: nowrap; text-overflow: ellipsis; width: 100%; overflow: hidden;'>$label</div>
-                <div style='font-size: clamp(10px, {$valFontSize}cqi, 48px); font-weight: bold; white-space: nowrap;'>$formatted</div>
+            <div style='
+                grid-area: $row / $col;
+                border: 1px solid rgba(255,255,255,0.1);
+                padding: 1cqi;
+                text-align: center;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                border-radius: 4px;
+                overflow: hidden;
+            '>
+                <div style='
+                    font-size: clamp(8px, 2.2cqi, 18px);
+                    opacity: 0.7;
+                    white-space: nowrap;
+                    text-overflow: ellipsis;
+                    width: 100%;
+                    overflow: hidden;
+                '>
+                    $label
+                </div>
+
+                <div style='
+                    font-size: clamp(
+                        10px,
+                        {$valFontSize}cqi,
+                        48px
+                    );
+                    font-weight: bold;
+                    white-space: nowrap;
+                '>
+                    $formatted
+                </div>
+
                 $chartHtml
-            </div>";
-        }
-
-        $highChartsScript = "<script src='https://code.highcharts.com/highcharts.js'></script><script src='https://code.highcharts.com/highcharts-more.js'></script><script src='https://code.highcharts.com/modules/datagrouping.js'></script><script src='https://code.highcharts.com/modules/windbarb.js'></script>";
-
-        // Synchronized AJAX refresh (Flicker-free)
-        $reloadScript = "";
-        if ($interval > 0) {
-            $lastUpdate = IPS_GetVariable($this->GetIDForIdent('Dashboard'))['VariableUpdated'];
-            $nextUpdate = $lastUpdate + $interval;
-            $secondsToWait = max(1, ($nextUpdate - time()) + 2);
-            $reloadScript = "<script>setTimeout(function(){ 
-                const url = new URL(window.location.href); url.searchParams.set('ajax', '1');
-fetch(url).then(r => r.text()).then(html => {
-                    const c = document.getElementById('container');
-                    if (c && typeof Highcharts !== 'undefined') {
-                        // Speicher freigeben: Alle bestehenden Charts zerstören
-                        while (Highcharts.charts.length > 0) {
-                            if (Highcharts.charts[0]) Highcharts.charts[0].destroy();
-                            Highcharts.charts.shift();
-                        }
-                        c.innerHTML = html;
-                        const s = c.getElementsByTagName('script');
-                        for (let i=0; i<s.length; i++) { if(s[i].innerText.includes('initCharts')) eval(s[i].innerText); }
-                    }
-                });
-            }, " . ($secondsToWait * 1000) . ");</script>";
-        }
-
-        $html = "
-        <div style='container-type: inline-size; background-color: $bgColor; color: $fontColor; font-family: \"Segoe UI\", sans-serif; height: 100%; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 1.5cqi; border-radius: 8px;'>
-            $highChartsScript
-            <div style='text-align: center; font-size: clamp(12px, 5cqi, 48px); font-weight: bold; padding-bottom: 1.5cqi; border-bottom: 1px solid rgba(255,255,255,0.2);'>
-                $stationName <span style='font-size: 0.6em; opacity: 0.6; margin-left: 2cqi;'>($timeStr)</span>
-                <div style='font-size: 0.4em; opacity: 0.8; font-weight: normal; margin-top: 0.5cqi;'>$sysCondStr</div>
             </div>
-            <div style='display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 1cqi; flex-grow: 1; margin-top: 1.5cqi;'>
+        ";
+        }
+
+        /*
+     * Highcharts libraries.
+     */
+        $highChartsScript =
+            "<script src='https://code.highcharts.com/highcharts.js'>"
+            . '</script>'
+            . "<script src='https://code.highcharts.com/highcharts-more.js'>"
+            . '</script>'
+            . "<script src='https://code.highcharts.com/modules/datagrouping.js'>"
+            . '</script>'
+            . "<script src='https://code.highcharts.com/modules/windbarb.js'>"
+            . '</script>';
+
+        /*
+     * Complete dashboard HTML.
+     */
+        $html = "
+        <div style='
+            container-type: inline-size;
+            background-color: $bgColor;
+            color: $fontColor;
+            font-family: \"Segoe UI\", sans-serif;
+            height: 100%;
+            width: 100%;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            padding: 1.5cqi;
+            border-radius: 8px;
+        '>
+            $highChartsScript
+
+            <div style='
+                text-align: center;
+                font-size: clamp(12px, 5cqi, 48px);
+                font-weight: bold;
+                padding-bottom: 1.5cqi;
+                border-bottom:
+                    1px solid rgba(255,255,255,0.2);
+            '>
+                $stationName
+
+                <span style='
+                    font-size: 0.6em;
+                    opacity: 0.6;
+                    margin-left: 2cqi;
+                '>
+                    ($timeStr)
+                </span>
+
+                <div style='
+                    font-size: 0.4em;
+                    opacity: 0.8;
+                    font-weight: normal;
+                    margin-top: 0.5cqi;
+                '>
+                    $sysCondStr
+                </div>
+            </div>
+
+            <div style='
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                grid-auto-rows: 1fr;
+                gap: 1cqi;
+                flex-grow: 1;
+                margin-top: 1.5cqi;
+            '>
                 $itemsHtml
             </div>
+
             <script>
                 (function() {
                     function initCharts() {
-                        if (typeof Highcharts === 'undefined' || typeof Highcharts.seriesTypes.windbarb === 'undefined') {
+                        if (
+                            typeof Highcharts === 'undefined'
+                            || typeof Highcharts.seriesTypes.windbarb
+                                === 'undefined'
+                        ) {
                             setTimeout(initCharts, 50);
                             return;
                         }
-                        Highcharts.setOptions({ time: { timezoneOffset: $tzOffset } });
+
+                        Highcharts.setOptions({
+                            time: {
+                                timezoneOffset: $tzOffset
+                            }
+                        });
+
                         $chartScripts
                     }
+
                     initCharts();
                 })();
             </script>
-        </div>";
+        </div>
+    ";
 
         $this->SetValue('Dashboard', $html);
     }
