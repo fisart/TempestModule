@@ -599,29 +599,112 @@ class TempestWeatherStation extends IPSModule
 
                             if ($speedID && AC_GetLoggingStatus($archiveID, $speedID)) {
                                 // Use same timeframe + cap as the direction series to keep barb pairing stable
-                                $speedHistory = AC_GetLoggedValues($archiveID, $speedID, time() - ($tfHours * 3600), time(), $maxPts);
-                                $speedMap = [];
-                                foreach ($speedHistory as $sRow) {
-                                    $speedMap[$sRow['TimeStamp']] = $sRow['Value'];
-                                }
+                                $speedHistory = AC_GetLoggedValues(
+                                    $archiveID,
+                                    $speedID,
+                                    time() - ($tfHours * 3600),
+                                    time(),
+                                    $maxPts
+                                );
 
-                                $speedPoints = [];
-                                $barbPoints = [];
-                                foreach (array_reverse($history) as $row) {
-                                    if (isset($speedMap[$row['TimeStamp']])) {
-                                        $sVal = round($speedMap[$row['TimeStamp']], 2);
-                                        $dVal = round($row['Value'], 2);
-                                        $ts = $row['TimeStamp'] * 1000;
-                                        $speedPoints[] = "[$ts, $sVal]";
-                                        $barbPoints[] = "[$ts, $sVal, $dVal]";
+                                if (is_array($speedHistory) && count($speedHistory) > 1) {
+
+                                    // AC_GetLoggedValues liefert normalerweise neueste Werte zuerst.
+                                    // Für die Diagrammerzeugung chronologisch sortieren.
+                                    $directionRows = array_reverse($history);
+                                    $speedRows = array_reverse($speedHistory);
+
+                                    /*
+     * Geschwindigkeitskurve unabhängig von der Windrichtung aufbauen.
+     * Dadurch gehen keine Geschwindigkeitswerte verloren.
+     */
+                                    $speedPoints = [];
+
+                                    foreach ($speedRows as $sRow) {
+                                        $ts = (int)$sRow['TimeStamp'] * 1000;
+                                        $speedKmh = round((float)$sRow['Value'], 2);
+
+                                        $speedPoints[] = "[$ts,$speedKmh]";
                                     }
+
+                                    // Kurve bis zum aktuellen Zeitpunkt verlängern.
+                                    $latestSpeedKmh = round((float)($speedHistory[0]['Value'] ?? 0), 2);
+                                    $speedPoints[] = "[" . (time() * 1000) . ",$latestSpeedKmh]";
+
+                                    /*
+     * Richtung mit dem zeitlich nächstgelegenen Geschwindigkeitswert
+     * verbinden, statt sekundengenaue Gleichheit zu verlangen.
+     */
+                                    $barbPoints = [];
+                                    $speedIndex = 0;
+                                    $speedCount = count($speedRows);
+
+                                    // Rapid Wind kommt häufiger als obs_st.
+                                    $maximumTimeDifference = $isRapidChart ? 2 : 5;
+
+                                    foreach ($directionRows as $directionRow) {
+                                        $directionTimestamp = (int)$directionRow['TimeStamp'];
+
+                                        /*
+         * Zum zeitlich nächstgelegenen Geschwindigkeitswert vorlaufen.
+         */
+                                        while (
+                                            ($speedIndex + 1) < $speedCount &&
+                                            abs(
+                                                (int)$speedRows[$speedIndex + 1]['TimeStamp']
+                                                    - $directionTimestamp
+                                            ) <= abs(
+                                                (int)$speedRows[$speedIndex]['TimeStamp']
+                                                    - $directionTimestamp
+                                            )
+                                        ) {
+                                            $speedIndex++;
+                                        }
+
+                                        $speedTimestamp = (int)$speedRows[$speedIndex]['TimeStamp'];
+                                        $timeDifference = abs($speedTimestamp - $directionTimestamp);
+
+                                        if ($timeDifference > $maximumTimeDifference) {
+                                            continue;
+                                        }
+
+                                        $speedKmh = (float)$speedRows[$speedIndex]['Value'];
+
+                                        /*
+         * Highcharts erwartet für Windbarbs die Geschwindigkeit in m/s.
+         * Die Flächenkurve bleibt weiterhin in km/h.
+         */
+                                        $speedMs = round($speedKmh / 3.6, 2);
+                                        $direction = round((float)$directionRow['Value'], 2);
+                                        $ts = $directionTimestamp * 1000;
+
+                                        $barbPoints[] = "[$ts,$speedMs,$direction]";
+                                    }
+
+                                    $dataString =
+                                        "{"
+                                        . "type: 'area',"
+                                        . "data: [" . implode(',', $speedPoints) . "],"
+                                        . "color: '$chartColor',"
+                                        . "fillOpacity: 0.3,"
+                                        . "zIndex: 1,"
+                                        . "tooltip: {"
+                                        . "pointFormat: '{point.x:%H:%M}: <b>{point.y:.1f} km/h</b>'"
+                                        . "}"
+                                        . "},"
+                                        . "{"
+                                        . "type: 'windbarb',"
+                                        . "data: [" . implode(',', $barbPoints) . "],"
+                                        . "color: '$fontColor',"
+                                        . "zIndex: 2,"
+                                        . "vectorLength: " . ($cHeight * 0.8) . ","
+                                        . "yOffset: -" . ($cHeight / 2) . ","
+                                        . "xOffset: 10,"
+                                        . "tooltip: {"
+                                        . "pointFormat: '{point.x:%H:%M}: <b>{point.direction:.0f}°</b>'"
+                                        . "}"
+                                        . "}";
                                 }
-
-                                // Append virtual point at current time to show speed continuing to now
-                                $lastSpeed = $speedHistory[0]['Value'] ?? 0;
-                                $speedPoints[] = "[" . (time() * 1000) . "," . round($lastSpeed, 2) . "]";
-
-                                $dataString = "{ type: 'area', data: [" . implode(',', $speedPoints) . "], color: '$chartColor', fillOpacity: 0.3, zIndex: 1, tooltip: { pointFormat: '{point.x:%H:%M}: <b>{point.y:.1f} km/h</b>' } }, { type: 'windbarb', data: [" . implode(',', $barbPoints) . "], color: '$fontColor', zIndex: 2, vectorLength: " . ($cHeight * 0.8) . ", yOffset: -" . ($cHeight / 2) . ", xOffset: 10, tooltip: { pointFormat: '{point.x:%H:%M}: <b>{point.direction:.0f}°</b>' } }";
                             }
                         } else {
                             foreach (array_reverse($history) as $row) {
