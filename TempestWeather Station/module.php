@@ -976,8 +976,8 @@ class TempestWeatherStation extends IPSModule
                                         if (
                                             empty($sampledBarbs)
                                             || $sampledBarbs[array_key_last(
-                                                    $sampledBarbs
-                                                )]['timestamp']
+                                                $sampledBarbs
+                                            )]['timestamp']
                                             !== $lastBarb['timestamp']
                                         ) {
                                             $sampledBarbs[] = $lastBarb;
@@ -1498,18 +1498,92 @@ class TempestWeatherStation extends IPSModule
 
     private function ProcessRapidWind(array $data)
     {
-        $timestamp = $data['ob'][0];
-        if ($this->CheckTimestamp('Time_Epoch_Wind', $timestamp) === 'INVALID') return;
+        if (!isset($data['ob'][0], $data['ob'][1], $data['ob'][2])) {
+            return;
+        }
+
+        $timestamp = (int)$data['ob'][0];
+
+        /*
+     * CheckTimestamp muss vor dem erstmaligen Anlegen der Variable
+     * aufgerufen werden. Bei einer noch nicht vorhandenen Variable
+     * liefert die Funktion korrekt NEW_VALUE.
+     */
+        $check = $this->CheckTimestamp(
+            'Time_Epoch_Wind',
+            $timestamp
+        );
+
+        if ($check === 'INVALID') {
+            return;
+        }
+
         $prefix = $this->ReadPropertyString('ProfilePrefix');
-        if ($prefix !== '' && substr($prefix, -1) !== '.' && substr($prefix, -1) !== '_') {
+
+        if (
+            $prefix !== ''
+            && substr($prefix, -1) !== '.'
+            && substr($prefix, -1) !== '_'
+        ) {
             $prefix .= '.';
         }
 
-        $this->MaintainVariable('Wind_Speed', 'Wind Speed', 2, $prefix . 'km_pro_stunde', 10, true);
-        $this->HandleValueUpdate('Wind_Speed', $data['ob'][1] * 3.6, $timestamp, 'NEW_VALUE');
+        /*
+     * Zeitstempel des letzten Rapid-Wind-Pakets.
+     */
+        $this->MaintainVariableSafe(
+            'Time_Epoch_Wind',
+            'Time Epoch Wind',
+            1,
+            $prefix . 'UnixTimestamp',
+            9,
+            true
+        );
 
-        $this->MaintainVariable('Wind_Direction_Rapid', 'Wind Direction (Rapid)', 2, $prefix . 'wind_direction', 11, true);
-        $this->HandleValueUpdate('Wind_Direction_Rapid', $data['ob'][2], $timestamp, 'NEW_VALUE');
+        $this->HandleValueUpdate(
+            'Time_Epoch_Wind',
+            $timestamp,
+            $timestamp,
+            $check
+        );
+
+        /*
+     * Windgeschwindigkeit in km/h.
+     */
+        $this->MaintainVariableSafe(
+            'Wind_Speed',
+            'Wind Speed',
+            2,
+            $prefix . 'km_pro_stunde',
+            10,
+            true
+        );
+
+        $this->HandleValueUpdate(
+            'Wind_Speed',
+            (float)$data['ob'][1] * 3.6,
+            $timestamp,
+            $check
+        );
+
+        /*
+     * Windrichtung in Grad.
+     */
+        $this->MaintainVariableSafe(
+            'Wind_Direction_Rapid',
+            'Wind Direction (Rapid)',
+            2,
+            $prefix . 'wind_direction',
+            11,
+            true
+        );
+
+        $this->HandleValueUpdate(
+            'Wind_Direction_Rapid',
+            (float)$data['ob'][2],
+            $timestamp,
+            $check
+        );
     }
 
     private function ProcessPrecip(array $data)
@@ -1526,18 +1600,82 @@ class TempestWeatherStation extends IPSModule
 
     private function ProcessStrike(array $data)
     {
-        $timestamp = $data['evt'][0];
+        if (!isset($data['evt'][0], $data['evt'][1], $data['evt'][2])) {
+            return;
+        }
+
+        $timestamp = (int)$data['evt'][0];
+
+        $check = $this->CheckTimestamp(
+            'Time_Epoch_Strike',
+            $timestamp
+        );
+
+        if ($check === 'INVALID') {
+            return;
+        }
+
         $prefix = $this->ReadPropertyString('ProfilePrefix');
-        if ($prefix !== '' && substr($prefix, -1) !== '.' && substr($prefix, -1) !== '_') {
+
+        if (
+            $prefix !== ''
+            && substr($prefix, -1) !== '.'
+            && substr($prefix, -1) !== '_'
+        ) {
             $prefix .= '.';
         }
 
-        $this->MaintainVariable('Strike_Distance', 'Distance', 2, $prefix . 'km', 130, true);
-        $this->HandleValueUpdate('Strike_Distance', $data['evt'][1], $timestamp, 'NEW_VALUE');
-        $this->MaintainVariable('Strike_Energy', 'Energy', 1, $prefix . 'energy', 131, true);
-        $this->HandleValueUpdate('Strike_Energy', $data['evt'][2], $timestamp, 'NEW_VALUE');
-    }
+        /*
+     * Zeitstempel des letzten Blitzereignisses.
+     */
+        $this->MaintainVariableSafe(
+            'Time_Epoch_Strike',
+            'Time Epoch Strike',
+            1,
+            $prefix . 'UnixTimestamp',
+            129,
+            true
+        );
 
+        $this->HandleValueUpdate(
+            'Time_Epoch_Strike',
+            $timestamp,
+            $timestamp,
+            $check
+        );
+
+        $this->MaintainVariableSafe(
+            'Strike_Distance',
+            'Distance',
+            2,
+            $prefix . 'km',
+            130,
+            true
+        );
+
+        $this->HandleValueUpdate(
+            'Strike_Distance',
+            (float)$data['evt'][1],
+            $timestamp,
+            $check
+        );
+
+        $this->MaintainVariableSafe(
+            'Strike_Energy',
+            'Energy',
+            1,
+            $prefix . 'energy',
+            131,
+            true
+        );
+
+        $this->HandleValueUpdate(
+            'Strike_Energy',
+            (int)$data['evt'][2],
+            $timestamp,
+            $check
+        );
+    }
     private function CheckTimestamp(string $ident, int $timestamp)
     {
         $varID = @$this->GetIDForIdent($ident);
@@ -1748,8 +1886,16 @@ class TempestWeatherStation extends IPSModule
             }
         }
         // Rapid Wind (kommt nicht aus descriptions[], wird aber als Variable erzeugt)
+        $master['Time_Epoch_Wind'] = 'Time Epoch Wind';
         $master['Wind_Speed'] = 'Wind Speed (Rapid)';
         $master['Wind_Direction_Rapid'] = 'Wind Direction (Rapid)';
+
+        /*
+ * Lightning strike event variables.
+ */
+        $master['Time_Epoch_Strike'] = 'Time Epoch Strike';
+        $master['Strike_Distance'] = 'Strike Distance';
+        $master['Strike_Energy'] = 'Strike Energy';
         // Device Status
         if (isset($config['descriptions']['device_status'])) {
             foreach ($config['descriptions']['device_status'] as $name) {
