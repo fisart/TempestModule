@@ -1788,6 +1788,8 @@ class TempestWeatherStation extends IPSModule
 
             'Lightning Strike Count'        => 'count',
             'Counter Slope Datasets'        => 'count',
+            'Reboot Count'                  => 'count',
+            'I2C Bus Error Count'           => 'count',
             'Distance'                      => 'km',
             'Report Interval'               => 'minutes',
 
