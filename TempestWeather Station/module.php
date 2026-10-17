@@ -1,6 +1,8 @@
 <?php
 
 declare(strict_types=1);
+require_once __DIR__ . '/../libs/SystemPortalNavigation.php';
+
 
 require_once __DIR__ . '/../libs/RegressionHelper.php';
 
@@ -152,6 +154,20 @@ class TempestWeatherStation extends IPSModule
      * This function is called by the Webhook Bot
      */
     protected function ProcessHookData()
+    {
+        // Only complete HTML documents are decorated; API payloads remain unchanged.
+        $systemPortalVault = (int)$this->ReadPropertyInteger('SecretsInstanceID');
+        ob_start(static function (string $html) use ($systemPortalVault): string {
+            return isset($_GET['ajax']) ? $html : AFSystemPortalNavigationV1::inject($html, $systemPortalVault);
+        });
+        try {
+            $this->RenderHookContentWithPortal();
+        } finally {
+            ob_end_flush();
+        }
+    }
+
+    private function RenderHookContentWithPortal()
     {
         // 1. Web App Manifest Handler
         if (isset($_GET['manifest'])) {
