@@ -95,7 +95,7 @@ trait TempestPrivateWeb
     private function Navigation(): array
     {
         $links=['weather'=>$this->WeatherPath(),'admin'=>$this->AdminPath()];
-        foreach(['portal'=>['PortalInstanceID',self::PORTAL,'alarm_portal_'],'documentation'=>['DocumentationInstanceID','{FBEB2EF6-8D23-49D7-A256-6D0C8D973B24}','alarm_documentation_']] as $key=>[$property,$module,$prefix])try{$id=$this->IntegrationInstance($property,$module);if(IPS_GetProperty($id,'Enabled')===true)$links[$key]='/hook/'.$prefix.$id.($key==='documentation'?'#tempest-afprivat':'');}catch(Throwable $e){}
+        foreach(['portal'=>['PortalInstanceID',self::PORTAL,'portal'],'documentation'=>['DocumentationInstanceID','{FBEB2EF6-8D23-49D7-A256-6D0C8D973B24}','alarm_documentation_']] as $key=>[$property,$module,$prefix])try{$id=$this->IntegrationInstance($property,$module);if(IPS_GetProperty($id,'Enabled')===true)$links[$key]=$key==='portal'?'/hook/portal':'/hook/'.$prefix.$id.'#tempest-afprivat';}catch(Throwable $e){}
         return $links;
     }
     private function CurrentWeather(string $revision): array

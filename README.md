@@ -1,6 +1,6 @@
 # Weatherflow Tempest — afprivat
 
-Version **4.9.0, build 2**. This branch adds native Secrets passkey protection, separate weather and administration pages, Portal registration, debug output and module-owned configuration protection. It retains the Tempest UDP receiver, existing variable identifiers, library/module GUIDs, TMT prefix and archive backfill behavior.
+Version **4.9.1, build 3**. This branch adds native Secrets passkey protection, separate weather and administration pages, Portal registration, debug output and module-owned configuration protection. It retains the Tempest UDP receiver, existing variable identifiers, library/module GUIDs, TMT prefix and archive backfill behavior.
 
 ## Install and open
 
@@ -8,7 +8,7 @@ Version **4.9.0, build 2**. This branch adds native Secrets passkey protection, 
 2. Select the **new native Secrets backend** under General Settings → Native Secrets backend. With exactly one enabled, correctly linked backend/frontend pair, selection is automatic. The backend must provide `SECB_IsNativePortalAuthenticated` and `SECB_GetNativePortalLoginURL`. Its frontend must point back to that backend with the same trusted AdminOrigin. A migrated legacy adapter can resolve its ready native-only replacement; old vault login and Basic authentication are never used.
 3. Enable protected web pages and Apply. Hook/Portal registration runs after Symcon is ready. Open the paths in the child **WebLinks** variable using the native Secrets HTTPS address. Anonymous page requests go to the native frontend passkey login; all API and chart requests recheck the native session and transport. Approved backup-address validation is delegated to the native backend.
 4. Portal receives **Smart Home → Weather — [station]** and **Administration → Tempest administration — [station]** through Additional Pages. Enable “Include administration” in Portal to see its administration group. If several Portal or Dokumentation instances exist, select the intended instance in the Tempest form. Pending Portal edits and conflicting webhook ownership are preserved; resolve the status message and use **Register pages and Portal links** again.
-5. Update Dokumentation to **1.33, build 65**. Its **Smart Home → Weatherflow Tempest — afprivat** guide covers installation, permissions, display, diagnostics and restore. Both Tempest pages include Portal and Dokumentation links when those instances are available.
+5. Update Dokumentation to **1.34, build 66**. Its **Smart Home → Weatherflow Tempest — afprivat** guide covers installation, permissions, display, diagnostics and restore. Both Tempest pages include Portal and Dokumentation links when those instances are available.
 
 ## Weather page
 
@@ -52,3 +52,5 @@ node tests/private-web-ui.cjs
 ```
 
 The browser check requires Playwright/Chromium; optional `PHP_BIN` and `CHROMIUM_PATH` select installed binaries. Backend fixtures exercise actual module authentication, origin validation, administration permission, CSRF/session binding, optimistic revision handling, hook/Portal ownership, native backup/import safety, the real UDP observation path, unit conversion and out-of-order archive backfill. Browser fixtures exercise desktop/mobile layout, the real nonce CSP, polling, tooltips, save/export, read-only mode, import lockout and expired sessions. No live vault or weather station is contacted. Live passkey login, local archive availability and backup capture should be verified after updating the Symcon installation.
+
+Portal navigation uses `/hook/portal`. Update/apply Portal 1.7 first; it also retains the old instance-specific address for existing bookmarks.
