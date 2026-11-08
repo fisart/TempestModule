@@ -1,7 +1,8 @@
 <?php
 
 declare(strict_types=1);
-require_once __DIR__ . '/../libs/SystemPortalNavigation.php';
+require_once __DIR__ . '/PrivateWeb.php';
+require_once __DIR__ . '/Configuration.php';
 
 
 require_once __DIR__ . '/../libs/RegressionHelper.php';
@@ -12,7 +13,7 @@ require_once __DIR__ . '/../libs/RegressionHelper.php';
  */
 class TempestWeatherStation extends IPSModule
 {
-    use \MachineLearning\Regression\RegressionHelper;
+    use \MachineLearning\Regression\RegressionHelper, TempestPrivateWeb, TempestConfiguration;
 
     public function Create()
     {
@@ -30,7 +31,18 @@ class TempestWeatherStation extends IPSModule
         $this->RegisterPropertyString('TriggerValueSlope', '0.000004');
         $this->RegisterPropertyInteger('RegressionDataPoints', 45);
 
-        $this->RegisterPropertyInteger('AuthMode', 0);
+        $this->RegisterPropertyInteger('AuthMode', 3); // Retained property; afprivat always uses native passkeys.
+        $this->RegisterPropertyBoolean('WebEnabled', true);
+        $this->RegisterPropertyBoolean('AllowWebAdministration', false);
+        $this->RegisterPropertyBoolean('DebugEnabled', false);
+        $this->RegisterPropertyInteger('PortalInstanceID', 0);
+        $this->RegisterPropertyInteger('DocumentationInstanceID', 0);
+        $this->RegisterAttributeString('CSRFKey', bin2hex(random_bytes(32)));
+        $this->RegisterVariableString('Debug', 'Debug log', '~TextBox', 160);
+        $this->RegisterVariableString('WebStatus', 'Web page / integration status', '~TextBox', 161);
+        $this->RegisterVariableString('WebLinks', 'Weather and administration pages', '~TextBox', 162);
+        $this->RegisterTimer('PostApply', 1000, 'TMT_RunPostApply($_IPS["TARGET"]);');
+        $this->RegisterMessage(0, IPS_KERNELMESSAGE);
         $this->RegisterPropertyString('WebhookUser', '');
         $this->RegisterPropertyString('WebhookPassword', '');
 
@@ -77,7 +89,7 @@ class TempestWeatherStation extends IPSModule
         $this->RegisterPropertyBoolean('MsgPrecip', true);
         $this->RegisterPropertyBoolean('MsgStrike', true);
 
-        $this->RegisterPropertyString('WebhookPath', '/hook/tempest');
+        $this->RegisterPropertyString('WebhookPath', '/hook/tempest_' . $this->InstanceID);
     }
 
     public function ApplyChanges()
@@ -103,7 +115,8 @@ class TempestWeatherStation extends IPSModule
         $this->UpdateUI();
 
         // Register for Kernel Started message
-        $this->RegisterMessage(0, IPS_KERNELSTARTED);
+        $this->RegisterMessage(0, IPS_KERNELMESSAGE);
+        $this->SetTimerInterval('PostApply', 1000);
 
         // Set Receive Filter for supported Tempest UDP packet types (Rule 4.1)
         $this->SetReceiveDataFilter('.*(obs_st|device_status|hub_status|rapid_wind|evt_precip|evt_strike).*');
@@ -112,229 +125,26 @@ class TempestWeatherStation extends IPSModule
         $interval = $this->ReadPropertyBoolean('EnableHTML') ? $this->ReadPropertyInteger('HTMLUpdateInterval') : 0;
         $this->SetTimerInterval('UpdateDashboardTimer', $interval * 1000);
 
-        // Only proceed with instance-dependent logic if Kernel is ready
-        if (IPS_GetKernelRunlevel() == 10103) {
-            $this->RegisterHook($this->ReadPropertyString('WebhookPath'));
-            $this->GenerateHTMLDashboard();
-        }
     }
 
-    private function RegisterHook($WebHook)
-    {
-        $ids = IPS_GetInstanceListByModuleID('{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}');
-        if (count($ids) > 0) {
-            $controlID = $ids[0];
-            $hooks = json_decode(IPS_GetProperty($controlID, 'Hooks'), true);
-            if (!is_array($hooks)) $hooks = [];
-
-            $found = false;
-            foreach ($hooks as $index => $hook) {
-                if ($hook['Hook'] == $WebHook) {
-                    if ($hook['TargetID'] == $this->InstanceID) {
-                        return;
-                    }
-                    $hooks[$index]['TargetID'] = $this->InstanceID;
-                    $found = true;
-                }
-            }
-
-            if (!$found) {
-                $hooks[] = ['Hook' => $WebHook, 'TargetID' => $this->InstanceID];
-            }
-
-            IPS_SetProperty($controlID, 'Hooks', json_encode($hooks));
-            IPS_ApplyChanges($controlID);
-            $this->LogMessage("Webhook registered: " . $WebHook, KL_MESSAGE);
-        } else {
-            $this->LogMessage("Error: WebHook Control not found", KL_ERROR);
-        }
-    }
-
-    /**
-     * This function is called by the Webhook Bot
-     */
     protected function ProcessHookData()
     {
-        // Only complete HTML documents are decorated; API payloads remain unchanged.
-        $systemPortalVault = (int)$this->ReadPropertyInteger('SecretsInstanceID');
-        ob_start(static function (string $html) use ($systemPortalVault): string {
-            return isset($_GET['ajax']) ? $html : AFSystemPortalNavigationV1::inject($html, $systemPortalVault);
-        });
-        try {
-            $this->RenderHookContentWithPortal();
-        } finally {
-            ob_end_flush();
-        }
+        $body='';if(($_SERVER['REQUEST_METHOD']??'GET')==='POST')$body=(string)file_get_contents('php://input',false,null,0,262145);
+        $response=$this->PrivateResponse($_SERVER,$_GET,$body);
+        http_response_code($response['status']);foreach($response['headers'] as $key=>$value)header($key.': '.$value);echo $response['body'];
     }
-
-    private function RenderHookContentWithPortal()
-    {
-        // 1. Web App Manifest Handler
-        if (isset($_GET['manifest'])) {
-            header('Content-Type: application/json');
-            $bgColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLBackgroundColor'));
-            $webhookPath = $this->ReadPropertyString('WebhookPath');
-            echo json_encode([
-                "name" => $this->ReadPropertyString('StationName'),
-                "short_name" => "Tempest",
-                "start_url" => $webhookPath,
-                "scope" => $webhookPath,
-                "display" => "standalone",
-                "background_color" => $bgColor,
-                "theme_color" => $bgColor,
-                "icons" => [
-                    [
-                        "src" => "https://tempestwx.com/images/logo.svg",
-                        "sizes" => "192x192",
-                        "type" => "image/svg+xml"
-                    ]
-                ]
-            ]);
-            return;
-        }
-
-        // 2. Authentication Validation
-        $authMode = $this->ReadPropertyInteger('AuthMode');
-        $validUser = '';
-        $validPass = '';
-        $secretsID = $this->ReadPropertyInteger('SecretsInstanceID');
-
-        if ($authMode === 1) { // Manual
-            $validUser = $this->ReadPropertyString('WebhookUser');
-            $validPass = $this->ReadPropertyString('WebhookPassword');
-        } elseif ($authMode === 2) { // Secrets Manager (User/PW)
-            if ($secretsID > 0 && IPS_InstanceExists($secretsID)) {
-                $access_data = json_decode(SEC_GetSecret($secretsID, 'Webhooks'), true);
-                $validUser = $access_data['Tempest']['User'] ?? '';
-                $validPass = $access_data['Tempest']['PW'] ?? '';
-            }
-        } elseif ($authMode === 3) { // Passkey (Biometric)
-            if ($secretsID > 0 && IPS_InstanceExists($secretsID)) {
-                if (!SEC_IsPortalAuthenticated($secretsID)) {
-                    $currentUrl = $_SERVER['REQUEST_URI'] ?? '';
-                    $loginUrl = "/hook/secrets_" . $secretsID . "?portal=1&return=" . urlencode($currentUrl);
-                    header("Location: " . $loginUrl);
-                    exit;
-                }
-            }
-        }
-
-        // Only check Basic Auth for Manual or standard Secrets Manager modes
-        if ($authMode === 1 || $authMode === 2) {
-            if (!isset($_SERVER['PHP_AUTH_USER'])) $_SERVER['PHP_AUTH_USER'] = "";
-            if (!isset($_SERVER['PHP_AUTH_PW'])) $_SERVER['PHP_AUTH_PW'] = "";
-
-            if (($_SERVER['PHP_AUTH_USER'] !== $validUser) || ($_SERVER['PHP_AUTH_PW'] !== $validPass)) {
-                header('WWW-Authenticate: Basic Realm="Tempest Dashboard"');
-                header('HTTP/1.0 401 Unauthorized');
-                echo "Authorization required";
-                return;
-            }
-        }
-
-        // 3. Render Dashboard with Standalone App wrapper
-        // 3. AJAX Update Handler (Flicker Suppression)
-        $dashboardHTML = $this->GetValue('Dashboard');
-
-        if (isset($_GET['ajax'])) {
-            header('Content-Type: text/html; charset=utf-8');
-            // Wir filtern die Script-Tags für die Bibliotheken heraus, da diese bereits geladen sind
-            $html = $this->GetValue('Dashboard');
-            echo preg_replace('/<script src=.*?><\/script>/i', '', $html);
-            return;
-        }
-        $bgColor = sprintf("#%06X", $this->ReadPropertyInteger('HTMLBackgroundColor'));
-        $title = $this->ReadPropertyString('StationName');
-
-        echo "<!DOCTYPE html>
-        <html lang='en'>
-        <head>
-            <meta charset='UTF-8'>
-            <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
-            <title>$title</title>
-            <link rel='manifest' href='?manifest=1'>
-            <link rel='apple-touch-icon' href='https://tempestwx.com/images/logo.svg'>
-            <meta name='theme-color' content='$bgColor'>
-            <meta name='apple-mobile-web-app-capable' content='yes'>
-            <meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'>
-            <meta name='mobile-web-app-capable' content='yes'>
-            <meta name='apple-mobile-web-app-title' content='Tempest'>
-            <style>
-                body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background-color: $bgColor; }
-                #container { width: 100%; height: 100%; }
-            </style>
-        </head>
-        <body>
-            <div id='container'>
-                $dashboardHTML
-            </div>
-
-            <script>
-            (function() {
-                // Nur EIN Timer pro Page-Load
-                if (window.__tempestWrapperTimer) {
-                    clearTimeout(window.__tempestWrapperTimer);
-                }
-
-                var intervalSec = " . (int)$this->ReadPropertyInteger('HTMLUpdateInterval') . ";
-                if (!intervalSec || intervalSec <= 0) return;
-
-                function refreshOnce() {
-                    var url = new URL(window.location.href);
-                    url.searchParams.set('ajax', '1');
-
-                    fetch(url.toString(), { cache: 'no-store' })
-                        .then(function(r){ return r.text(); })
-                        .then(function(html){
-                            var c = document.getElementById('container');
-                            if (!c) return;
-
-                            // Alte Highcharts sauber zerstören, bevor wir den Container ersetzen
-                            if (typeof Highcharts !== 'undefined' && Highcharts.charts && Highcharts.charts.length) {
-                                for (var j = 0; j < Highcharts.charts.length; j++) {
-                                    if (Highcharts.charts[j]) {
-                                        try { Highcharts.charts[j].destroy(); } catch (e) {}
-                                    }
-                                }
-                                Highcharts.charts.length = 0;
-                            }
-
-                            // Container ersetzen
-                            c.innerHTML = html;
-
-                            // initCharts aus dem neuen HTML starten (wie bisher)
-                            var s = c.getElementsByTagName('script');
-                            for (var i=0; i<s.length; i++) {
-                                if (s[i].innerText && s[i].innerText.indexOf('initCharts') !== -1) {
-                                    eval(s[i].innerText);
-                                }
-                            }
-                        })
-                        .finally(function(){
-                            // Nächsten Tick planen
-                            window.__tempestWrapperTimer = setTimeout(refreshOnce, intervalSec * 1000);
-                        });
-                }
-
-                // Start
-                window.__tempestWrapperTimer = setTimeout(refreshOnce, intervalSec * 1000);
-            })();
-            </script>
-
-        </body>
-        </html>";
-    }
-
 
     public function ReceiveData($JSONString)
     {
+        if(IPS_GetKernelRunlevel()!==KR_READY||strlen($JSONString)>131072)return;
         $data = json_decode($JSONString, true);
         if (!$data) return;
 
+        if(!is_string($data['Buffer']??null))return;
         $payload = json_decode($data['Buffer'], true);
         if (!$payload || !isset($payload['type'])) return;
 
-        $this->SendDebug('ReceiveData', $data['Buffer'], 0);
+        $this->DebugEvent('ReceiveData', $data['Buffer'], 0);
 
         switch ($payload['type']) {
             case 'obs_st':
@@ -360,7 +170,7 @@ class TempestWeatherStation extends IPSModule
 
     private function ProcessObservation(array $data)
     {
-        $obs = $data['obs'][0];
+        $obs = $data['obs'][0]??null;if(!is_array($obs)||count($obs)<18||!is_int($obs[0]??null))return;foreach(array_slice($obs,0,18) as $v)if(!is_numeric($v)||!is_finite((float)$v))return;
         $timestamp = $obs[0];
 
         if ($obs[7] == 0 && $obs[8] == 0) {
@@ -420,18 +230,13 @@ class TempestWeatherStation extends IPSModule
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
     {
-        switch ($Message) {
-            case IPS_KERNELSTARTED:
-                $this->RegisterHook($this->ReadPropertyString('WebhookPath'));
-                $this->GenerateHTMLDashboard();
-                break;
-        }
+        if($SenderID===0&&$Message===IPS_KERNELMESSAGE&&(int)($Data[0]??0)===KR_READY)$this->SetTimerInterval('PostApply',100);
     }
 
     public function EnableLogging()
     {
         $archiveID = $this->ReadPropertyInteger('ArchiveID');
-        if ($archiveID === 0 || !IPS_InstanceExists($archiveID)) {
+        if ($archiveID === 0 || !IPS_InstanceExists($archiveID) || strtoupper(IPS_GetInstance($archiveID)['ModuleInfo']['ModuleID']??'')!=='{43192F0B-135B-4CE7-A0A7-1475603F3060}' || IPS_HasChanges($archiveID)) {
             echo "Error: Please select an Archive Control in the settings first.";
             return;
         }
@@ -541,7 +346,7 @@ class TempestWeatherStation extends IPSModule
             return;
         }
 
-        $stationName = $this->ReadPropertyString('StationName');
+        $stationName = htmlspecialchars($this->ReadPropertyString('StationName'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $bgColor = sprintf(
             '#%06X',
             $this->ReadPropertyInteger('HTMLBackgroundColor')
@@ -1769,8 +1574,8 @@ class TempestWeatherStation extends IPSModule
                 'count'  => ['type' => 1, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 1000000, 'step' => 1],
                 'text'   => ['type' => 3, 'digits' => 0, 'prefix' => '', 'suffix' => '', 'min' => 0, 'max' => 0, 'step' => 0]
             ],
-            'charge' => ['Text' => [2.33 => '+ Hybernate', 2.355 => '+ Wind 5 Min NO Lightning+Rain', 2.375 => '+ Wind 1m', 2.39 => '+ Wind 1m', 2.41 => '+ Wind 6s', 2.415 => '+ Wind 6s', 2.455 => '+ Full Perf'], 'Color' => [2.33 => $purple, 2.355 => $red, 2.375 => $orange, 2.39 => $orange, 2.41 => $yellow, 2.415 => $yellow, 2.455 => $green]],
-            'discharge' => ['Text' => [2.33 => '- Hybernate', 2.355 => '- Wind 5 Min NO Lightning+Rain', 2.375 => '- Wind 1m', 2.39 => '- Wind 1m', 2.41 => '- Wind 6s', 2.415 => '- Wind 6s', 2.455 => '- Full Perf'], 'Color' => [2.33 => $purple, 2.355 => $red, 2.375 => $orange, 2.39 => $orange, 2.41 => $yellow, 2.415 => $yellow, 2.455 => $green]]
+            'charge' => ['Text' => ['2.33' => '+ Hybernate', '2.355' => '+ Wind 5 Min NO Lightning+Rain', '2.375' => '+ Wind 1m', '2.39' => '+ Wind 1m', '2.41' => '+ Wind 6s', '2.415' => '+ Wind 6s', '2.455' => '+ Full Perf'], 'Color' => ['2.33' => $purple, '2.355' => $red, '2.375' => $orange, '2.39' => $orange, '2.41' => $yellow, '2.415' => $yellow, '2.455' => $green]],
+            'discharge' => ['Text' => ['2.33' => '- Hybernate', '2.355' => '- Wind 5 Min NO Lightning+Rain', '2.375' => '- Wind 1m', '2.39' => '- Wind 1m', '2.41' => '- Wind 6s', '2.415' => '- Wind 6s', '2.455' => '- Full Perf'], 'Color' => ['2.33' => $purple, '2.355' => $red, '2.375' => $orange, '2.39' => $orange, '2.41' => $yellow, '2.415' => $yellow, '2.455' => $green]]
         ];
     }
 
@@ -1948,24 +1753,6 @@ class TempestWeatherStation extends IPSModule
     {
         $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
 
-        // 1. Handle Visibility in General Settings
-        $authMode = $this->ReadPropertyInteger('AuthMode');
-        foreach ($form['elements'] as &$panel) {
-            if (isset($panel['caption']) && $panel['caption'] == 'General Settings') {
-                foreach ($panel['items'] as &$item) {
-                    if (in_array($item['name'], ['WebhookUser', 'WebhookPassword'])) {
-                        $item['visible'] = ($authMode === 1);
-                    }
-                    if ($item['name'] == 'SecretsInstanceID') {
-                        $item['visible'] = ($authMode === 2 || $authMode === 3);
-                    }
-                }
-            }
-        }
-        unset($panel); // CRITICAL: Destroy reference to prevent corruption of subsequent loops
-        unset($item);
-        unset($panel);
-
         // 2. Prepare Dashboard Grid Data
         $master = $this->GetMasterMetadata();
         $bufferData = $this->ReadAttributeString('HTMLVariableListBuffer');
@@ -2018,15 +1805,7 @@ class TempestWeatherStation extends IPSModule
 
     public function UpdateUI()
     {
-        $authMode = $this->ReadPropertyInteger('AuthMode');
-
-        // Toggle visibility based on selected mode
-        // Mode 1 = Manual
-        $this->UpdateFormField('WebhookUser', 'visible', ($authMode === 1));
-        $this->UpdateFormField('WebhookPassword', 'visible', ($authMode === 1));
-
-        // Mode 2 = Secrets Manager, Mode 3 = Passkey
-        $this->UpdateFormField('SecretsInstanceID', 'visible', ($authMode === 2 || $authMode === 3));
+        $this->UpdateFormField('SecretsInstanceID', 'visible', true);
     }
 
     public function UpdateDashboardRow(string $HTMLVariableList)
@@ -2056,7 +1835,7 @@ class TempestWeatherStation extends IPSModule
         }
 
         $this->WriteAttributeString('HTMLVariableListBuffer', json_encode(array_values($map)));
-        $this->SendDebug('UI-Update', 'RAM-Cache updated and types cast.', 0);
+        $this->DebugEvent('UI-Update', 'RAM-Cache updated and types cast.', 0);
     }
 
     public function SaveSelections()
@@ -2077,6 +1856,7 @@ class TempestWeatherStation extends IPSModule
 
     public function UpdateDashboard()
     {
+        if(IPS_GetKernelRunlevel()!==KR_READY)return;
         $this->GenerateHTMLDashboard();
     }
 }

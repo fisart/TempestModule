@@ -1,0 +1,25 @@
+name: afprivat protected Tempest pages
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  php:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax and native authentication/configuration regressions
+        run: |
+          find 'TempestWeather Station' libs tests -name '*.php' -print0 | xargs -0 -n1 php -l
+          php tests/system_portal_navigation.php
+          php tests/private-web.php
+          TEMPEST_NO_NATIVE=1 php tests/private-web.php
+  browser:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save playwright@1.56.1
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/private-web-ui.cjs
