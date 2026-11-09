@@ -57,3 +57,9 @@ The browser check requires Playwright/Chromium; optional `PHP_BIN` and `CHROMIUM
 
 Portal navigation uses `/hook/portal`. Update/apply Portal 1.7 first; it also retains the old instance-specific address for existing bookmarks.
 
+
+## Preventing configuration checksum regressions
+
+Use the [central canonical checksum contract and release gate](https://github.com/fisart/Symcon-Backup-Module/blob/main/.docs/configuration-backup-requirements.md#canonical-checksums-and-release-gate--9-november-2026) for all backup/export changes. The canonical flags are `JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR`; preserve numeric types in native, web and protocol JSON as well as hashes. The validator hashes the exact received payload, before import normalization.
+
+Before publication run `tests/private-web.php` against an independently sourced `MCBBackupProtocol` and `MCBEngine` using `TEMPEST_BACKUP_PROTOCOL` and `TEMPEST_BACKUP_ENGINE`. Use whole-number float fixtures and ensure the Symcon configuration stub preserves their types. Confirm real source mismatches still fail. Testing the export against Tempest’s own canonical helper alone cannot catch incompatible encoding. The 4.9.2 integration run passed 85 assertions; passing schema validation does not claim a live restore.
