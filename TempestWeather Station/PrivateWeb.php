@@ -173,7 +173,7 @@ trait TempestPrivateWeb
             if($action==='data')return $reply(200,$this->CurrentWeather(is_string($query['revision']??null)?$query['revision']:''));
             if($action==='history')return $reply(200,$this->ChartHistory($query));
             if($admin&&$action==='admin-state')return $reply(200,$this->AdminState($server,$backend));
-            if($admin&&$action==='export'){$r=$reply(200,$this->PortableConfiguration());$r['headers']['Content-Disposition']='attachment; filename="Tempest-'.$this->InstanceID.'.json"';return $r;}
+            if($admin&&$action==='export'){$r=$reply(200,[]);$r['body']=$this->ExportConfig();$r['headers']['Content-Disposition']='attachment; filename="Tempest-'.$this->InstanceID.'.json"';return $r;}
             if($action==='manifest')return $reply(200,['name'=>$this->ReadPropertyString('StationName'),'short_name'=>'Tempest','start_url'=>$this->WeatherPath(),'scope'=>$this->WeatherPath(),'display'=>'standalone']);
             if($action!=='page')return $reply(404,['error'=>'Unknown page action.']);
             $nonce=base64_encode(random_bytes(18));$headers['Content-Type']='text/html; charset=utf-8';$headers['Content-Security-Policy']="default-src 'none'; script-src 'nonce-".$nonce."'; style-src 'nonce-".$nonce."'; connect-src 'self'; img-src 'self' data:; manifest-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
@@ -182,3 +182,4 @@ trait TempestPrivateWeb
         catch(Throwable $e){$this->DebugEvent('web-error',get_class($e),0);return $reply(503,['error'=>'Tempest request failed. Check the instance WebStatus and debug log.']);}
     }
 }
+

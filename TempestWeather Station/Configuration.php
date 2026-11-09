@@ -6,7 +6,7 @@ trait TempestConfiguration
     private static function Canonical($value): string
     {
         $sort=function($v)use(&$sort){if(!is_array($v))return $v;if(!array_is_list($v))ksort($v,SORT_STRING);foreach($v as &$item)$item=$sort($item);return $v;};
-        return json_encode($sort($value),JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+        return json_encode($sort($value),JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR);
     }
     private function ValidProperties(array $input): array
     {
@@ -32,13 +32,13 @@ trait TempestConfiguration
             $seen[$row['Ident']]=true;$row['Label']=$known[$row['Ident']];$row['ShowChart']=$row['ShowChart']??false;
             if(!is_bool($row['Show']??null)||!is_bool($row['ShowChart'])||!is_int($row['Row']??null)||!is_int($row['Col']??null)||$row['Row']<1||$row['Row']>150||$row['Col']<1||$row['Col']>4)throw new InvalidArgumentException('Invalid dashboard row settings.');
         }unset($row);
-        $p['HTMLVariableList']=json_encode($rows,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+        $p['HTMLVariableList']=json_encode($rows,JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR);
         // Old auth settings remain schema-compatible, but are never used or exported as credentials.
         $p['AuthMode']=3;$p['WebhookUser']='';$p['WebhookPassword']='';return $p;
     }
     private function AppliedProperties(): array {return $this->ValidProperties(json_decode(IPS_GetConfiguration($this->InstanceID),true,64,JSON_THROW_ON_ERROR));}
     private function PortableConfiguration(): array {return ['schema'=>'Tempest.afprivat.v1','moduleID'=>self::PRIVATE_MODULE,'properties'=>$this->AppliedProperties()];}
-    public function ExportConfig(): string {return json_encode($this->PortableConfiguration(),JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);}
+    public function ExportConfig(): string {return json_encode($this->PortableConfiguration(),JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR);}
     public function ImportConfig(string $JSON): string
     {
         if(strlen($JSON)>262144)throw new InvalidArgumentException('Configuration too large.');$v=json_decode($JSON,true,64,JSON_THROW_ON_ERROR);
@@ -46,20 +46,20 @@ trait TempestConfiguration
         if(IPS_HasChanges($this->InstanceID))throw new InvalidArgumentException('Apply or discard pending Tempest edits before import.');
         $p=$this->ValidProperties($v['properties']);$p['WebEnabled']=false;$p['AllowWebAdministration']=false;
         $this->WriteAttributeString('HTMLVariableListBuffer',$p['HTMLVariableList']);$this->SetBuffer('PrivateState','');
-        IPS_SetConfiguration($this->InstanceID,json_encode($p,JSON_THROW_ON_ERROR));IPS_ApplyChanges($this->InstanceID);
+        IPS_SetConfiguration($this->InstanceID,json_encode($p,JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR));IPS_ApplyChanges($this->InstanceID);
         return 'Imported. Review the native Secrets backend and object IDs in the console, then enable web access.';
     }
     public function ExportToForm(): void {$this->UpdateFormField('BackupJSON','value',$this->ExportConfig());}
     public function ExportConfigurationBackup(): string
     {
         $properties=json_decode(IPS_GetConfiguration($this->InstanceID),true,64,JSON_THROW_ON_ERROR);
-        return json_encode(['schema'=>'Symcon.ConfigurationBackup.v1','moduleID'=>self::PRIVATE_MODULE,'format'=>'Tempest.afprivat.v1','payload'=>$this->PortableConfiguration(),'sourceHash'=>hash('sha256',self::Canonical(['properties'=>$properties,'attributes'=>[]])),'attributeNames'=>[],'restoreMode'=>'manual-native-import','exclusions'=>['Legacy web credentials','Native sessions','CSRF key','Pending form edits','Weather readings and archives','Debug history'],'notes'=>['Use TMT_ImportConfig on afprivat. Import disables web access and web administration.']],JSON_THROW_ON_ERROR);
+        return json_encode(['schema'=>'Symcon.ConfigurationBackup.v1','moduleID'=>self::PRIVATE_MODULE,'format'=>'Tempest.afprivat.v1','payload'=>$this->PortableConfiguration(),'sourceHash'=>hash('sha256',self::Canonical(['properties'=>$properties,'attributes'=>[]])),'attributeNames'=>[],'restoreMode'=>'manual-native-import','exclusions'=>['Legacy web credentials','Native sessions','CSRF key','Pending form edits','Weather readings and archives','Debug history'],'notes'=>['Use TMT_ImportConfig on afprivat. Import disables web access and web administration.']],JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR);
     }
     public function ValidateConfigurationBackup(string $JSON): string
     {
         if(strlen($JSON)>262144)throw new InvalidArgumentException('Configuration too large.');$v=json_decode($JSON,true,64,JSON_THROW_ON_ERROR);$issues=[];
         try{if(($v['schema']??'')!=='Tempest.afprivat.v1'||($v['moduleID']??'')!==self::PRIVATE_MODULE||array_diff(array_keys($v),['schema','moduleID','properties']))throw new InvalidArgumentException('Unsupported configuration schema.');if(!is_array($v['properties']??null))throw new InvalidArgumentException('Missing properties.');$this->ValidProperties($v['properties']);}catch(Throwable $e){$issues[]=$e->getMessage();}
-        return json_encode(['schema'=>'Symcon.ConfigurationBackupValidation.v1','valid'=>!$issues,'scope'=>'format','payloadHash'=>hash('sha256',self::Canonical($v)),'issues'=>$issues,'checks'=>['Native Tempest importer schema and property checks'],'notes'=>['No restore was executed.']],JSON_THROW_ON_ERROR);
+        return json_encode(['schema'=>'Symcon.ConfigurationBackupValidation.v1','valid'=>!$issues,'scope'=>'format','payloadHash'=>hash('sha256',self::Canonical($v)),'issues'=>$issues,'checks'=>['Native Tempest importer schema and property checks'],'notes'=>['No restore was executed.']],JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR);
     }
     private function SaveWebSettings(array $settings,string $revision): array
     {
@@ -69,6 +69,7 @@ trait TempestConfiguration
         if(array_intersect(array_keys($settings),$blocked)||array_diff(array_keys($settings),array_keys($current)))throw new InvalidArgumentException('These settings are console-only.');
         $next=$this->ValidProperties(array_replace($current,$settings));$archive=$next['ArchiveID'];
         if($archive>0&&(!IPS_InstanceExists($archive)||strtoupper(IPS_GetInstance($archive)['ModuleInfo']['ModuleID']??'')!=='{43192F0B-135B-4CE7-A0A7-1475603F3060}'))throw new InvalidArgumentException('Select an installed Archive Control.');
-        $this->WriteAttributeString('HTMLVariableListBuffer',$next['HTMLVariableList']);IPS_SetConfiguration($this->InstanceID,json_encode($next,JSON_THROW_ON_ERROR));IPS_ApplyChanges($this->InstanceID);$this->DebugEvent('settings','Weather settings updated from protected administration.',0);return ['message'=>'Settings saved.'];
+        $this->WriteAttributeString('HTMLVariableListBuffer',$next['HTMLVariableList']);IPS_SetConfiguration($this->InstanceID,json_encode($next,JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR));IPS_ApplyChanges($this->InstanceID);$this->DebugEvent('settings','Weather settings updated from protected administration.',0);return ['message'=>'Settings saved.'];
     }
 }
+

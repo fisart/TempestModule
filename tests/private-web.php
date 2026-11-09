@@ -13,7 +13,7 @@ class IPSModule {
 require __DIR__.'/../TempestWeather Station/module.php';
 function IPS_InstanceExists($id){return isset($GLOBALS['instances'][$id]);}function IPS_GetInstance($id){return ['ModuleInfo'=>['ModuleID'=>$GLOBALS['instances'][$id]['guid']]];}function IPS_GetInstanceListByModuleID($guid){return array_keys(array_filter($GLOBALS['instances'],fn($i)=>$i['guid']===$guid));}
 function IPS_GetProperty($id,$key){if(!array_key_exists($key,$GLOBALS['instances'][$id]['props']))throw new RuntimeException('Missing property '.$key);return $GLOBALS['instances'][$id]['props'][$key];}function IPS_HasChanges($id){return $GLOBALS['instances'][$id]['pending']??false;}
-function IPS_GetConfiguration($id){return json_encode($GLOBALS['instances'][$id]['props']);}function IPS_SetConfiguration($id,$json){$GLOBALS['instances'][$id]['props']=json_decode($json,true);$GLOBALS['writes']++;}function IPS_SetProperty($id,$key,$value){$GLOBALS['instances'][$id]['props'][$key]=$value;$GLOBALS['writes']++;}function IPS_ApplyChanges($id){$GLOBALS['applies'][]=$id;}
+function IPS_GetConfiguration($id){return json_encode($GLOBALS['instances'][$id]['props'],JSON_PRESERVE_ZERO_FRACTION);}function IPS_SetConfiguration($id,$json){$GLOBALS['instances'][$id]['props']=json_decode($json,true);$GLOBALS['writes']++;}function IPS_SetProperty($id,$key,$value){$GLOBALS['instances'][$id]['props'][$key]=$value;$GLOBALS['writes']++;}function IPS_ApplyChanges($id){$GLOBALS['applies'][]=$id;}
 function IPS_GetKernelRunlevel(){return $GLOBALS['runlevel'];}function IPS_SemaphoreEnter(...$v){return true;}function IPS_SemaphoreLeave(...$v){}function IPS_VariableExists($id){return isset($GLOBALS['vars'][$id]);}function IPS_GetVariable($id){return $GLOBALS['vars'][$id];}function IPS_GetObject($id){return ['ParentID'=>$GLOBALS['vars'][$id]['ParentID']];}function GetValue($id){return $GLOBALS['vars'][$id]['Value'];}function GetValueFormatted($id){return GetValue($id).($id===101?' %':' °C');}function SetValue($id,$v){$GLOBALS['vars'][$id]['Value']=$v;$GLOBALS['vars'][$id]['VariableUpdated']=time();}
 function AC_GetLoggingStatus(...$v){return true;}function AC_GetAggregationType(...$v){return 0;}function AC_GetAggregatedValues(...$v){$GLOBALS['archiveReads']++;return [['TimeStamp'=>time()-3600,'Avg'=>18.5],['TimeStamp'=>time()-7200,'Avg'=>17.0],['TimeStamp'=>time()-3600,'Avg'=>99.0],['TimeStamp'=>time()+9999,'Avg'=>100.0]];}function AC_GetLoggedValues(...$v){return [];}function AC_AddLoggedValues($a,$id,$values){$GLOBALS['backfill'][$id]=$values;}function AC_ReAggregateVariable(...$v){}
 function SEC_IsPortalAuthenticated(...$v){throw new RuntimeException('Legacy authentication must never be called');}if(getenv('TEMPEST_NO_NATIVE')!=='1'){function SECB_IsNativePortalAuthenticated($id){$GLOBALS['nativeChecks']++;return $GLOBALS['authenticated'];}
@@ -54,4 +54,23 @@ function IPS_GetModule($id){return ['Prefix'=>'TMT','ModuleName'=>'Tempest Weath
 function TMT_ExportConfigurationBackup($id){return $GLOBALS['backupFixture']->ExportConfigurationBackup();}
 function TMT_ValidateConfigurationBackup($id,$json){return $GLOBALS['backupFixture']->ValidateConfigurationBackup($json);}
 $backup=getenv('TEMPEST_BACKUP_PROTOCOL');if($backup){$engine=getenv('TEMPEST_BACKUP_ENGINE');if($engine)require $engine;else require $backup;MCBBackupProtocol::envelope($e,MODULE);expect(true,'Actual central backup module accepts envelope');if($engine){$GLOBALS['backupFixture']=setup();$props=json_decode(IPS_GetConfiguration(40),true);$capture=MCBBackupProtocol::capture(40,MODULE,$props,[]);expect($capture['validation']['valid']===true,'Actual central backup capture verifies source hash and native importer');}}
+// Whole-number floats must survive export and match the independent central protocol.
+foreach ([4.0,4.5,1.0,20.0] as $fontSize) {
+ $m=setup();$GLOBALS['instances'][40]['props']['HTMLFontSizeValue']=$fontSize;
+ $envelope=json_decode($m->ExportConfigurationBackup(),true,64,JSON_THROW_ON_ERROR);
+ expect(is_float($envelope['payload']['properties']['HTMLFontSizeValue'])&&$envelope['payload']['properties']['HTMLFontSizeValue']===$fontSize,'Backup JSON preserves float '.$fontSize);
+ $portable=json_decode($m->ExportConfig(),true,64,JSON_THROW_ON_ERROR);
+ expect($portable['properties']['HTMLFontSizeValue']===$fontSize,'Native export preserves float '.$fontSize);
+ $download=data(response($m,server(true),['action'=>'export']));
+ expect($download['properties']['HTMLFontSizeValue']===$fontSize,'Web export preserves float '.$fontSize);
+ if($backup&&$engine){
+  $GLOBALS['backupFixture']=$m;$props=json_decode(IPS_GetConfiguration(40),true);
+  $capture=MCBBackupProtocol::capture(40,MODULE,$props,[]);
+  expect($capture['validation']['valid']===true,'Central capture accepts source and payload hashes for float '.$fontSize);
+  $different=$props;$different['HTMLFontSizeValue']=$fontSize===4.5?5.5:4.5;
+  rejects(fn()=>MCBBackupProtocol::capture(40,MODULE,$different,[]),'Real property mismatch remains rejected');
+ }
+ expect($GLOBALS['writes']===0,'Backup checks do not change configuration');
+}
 echo "Tempest afprivat: $n assertions passed.\n";
+

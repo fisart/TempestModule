@@ -1,6 +1,6 @@
 # Weatherflow Tempest — afprivat
 
-Version **4.9.1, build 3**. This branch adds native Secrets passkey protection, separate weather and administration pages, Portal registration, debug output and module-owned configuration protection. It retains the Tempest UDP receiver, existing variable identifiers, library/module GUIDs, TMT prefix and archive backfill behavior.
+Version **4.9.2, build 4**. This branch adds native Secrets passkey protection, separate weather and administration pages, Portal registration, debug output and module-owned configuration protection. It retains the Tempest UDP receiver, existing variable identifiers, library/module GUIDs, TMT prefix and archive backfill behavior.
 
 ## Install and open
 
@@ -34,6 +34,8 @@ Import validates the schema, module GUID, types, numeric limits, timezone, local
 
 The current Configuration Backup module automatically discovers `TMT_ExportConfigurationBackup` and `TMT_ValidateConfigurationBackup` through its existing **Symcon.ConfigurationBackup.v1** protocol. Include the Tempest instance under the backup server's ordinary instance-selection rules. The envelope verifies the source hash against the actual saved properties, includes the native payload, and runs importer-format validation. No hard-coded backup adapter or backup-server source change is required.
 
+Version 4.9.2 fixes configuration-backup checksum compatibility for whole-number floating-point settings such as `HTMLFontSizeValue = 4.0`. Canonical source/payload hashes use the central backup protocol’s number encoding, and native, web and backup exports preserve floating-point types. Earlier versions could report an unsaved Tempest configuration repeatedly until the backup timed out. Update the **afprivat** library and Apply the existing Tempest instance; the backup server requires no update for this fix.
+
 Restore mode is manual native import: pass the envelope's **payload** JSON to `TMT_ImportConfig(instanceID, payloadJSON)`, or import an ordinary ExportConfig document from the console. A valid format report is not an executed live restore test. The supplemental pending editor cache is unnecessary because the native import rebuilds it from the saved layout. Receiving station packets, archive data, native vault storage and passkeys remain covered by their existing separate backups.
 
 ## Migration notes
@@ -54,3 +56,4 @@ node tests/private-web-ui.cjs
 The browser check requires Playwright/Chromium; optional `PHP_BIN` and `CHROMIUM_PATH` select installed binaries. Backend fixtures exercise actual module authentication, origin validation, administration permission, CSRF/session binding, optimistic revision handling, hook/Portal ownership, native backup/import safety, the real UDP observation path, unit conversion and out-of-order archive backfill. Browser fixtures exercise desktop/mobile layout, the real nonce CSP, polling, tooltips, save/export, read-only mode, import lockout and expired sessions. No live vault or weather station is contacted. Live passkey login, local archive availability and backup capture should be verified after updating the Symcon installation.
 
 Portal navigation uses `/hook/portal`. Update/apply Portal 1.7 first; it also retains the old instance-specific address for existing bookmarks.
+
