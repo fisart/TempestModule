@@ -3,6 +3,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/PrivateWeb.php';
 require_once __DIR__ . '/Configuration.php';
+require_once __DIR__ . '/WeatherSources.php';
 
 
 require_once __DIR__ . '/../libs/RegressionHelper.php';
@@ -13,7 +14,7 @@ require_once __DIR__ . '/../libs/RegressionHelper.php';
  */
 class TempestWeatherStation extends IPSModule
 {
-    use \MachineLearning\Regression\RegressionHelper, TempestPrivateWeb, TempestConfiguration;
+    use \MachineLearning\Regression\RegressionHelper, TempestPrivateWeb, TempestConfiguration, TempestWeatherSources;
 
     public function Create()
     {
@@ -25,6 +26,11 @@ class TempestWeatherStation extends IPSModule
         $this->RegisterPropertyString('ProfilePrefix', 'Tempest_');
         $this->RegisterPropertyInteger('SecretsInstanceID', 0);
         $this->RegisterPropertyInteger('ArchiveID', 0);
+        // Verified Berlin installation preset. Other instances start with unconfigured optional sources.
+        $this->RegisterPropertyInteger('HermitageRootID', $this->InstanceID === 58583 ? 21954 : 0);
+        $this->RegisterPropertyInteger('ForecastVariableID', $this->InstanceID === 58583 ? 22491 : 0);
+        $this->RegisterPropertyString('HermitageTimezone', 'America/New_York');
+        $this->RegisterPropertyString('DefaultWeatherView', 'berlin');
 
         // Battery Regression
         $this->RegisterPropertyBoolean('ExperimentalRegression', true);
@@ -249,17 +255,19 @@ class TempestWeatherStation extends IPSModule
 
         // 2. Enable for Chart variables
         $varList = json_decode($this->ReadPropertyString('HTMLVariableList'), true) ?: [];
+        $p=$this->AppliedProperties();$bindings=[];
+        foreach(['berlin','hermitage'] as $view)$bindings[$view]=$this->WeatherBindings($view,$p);
         foreach ($varList as $item) {
             if ($item['ShowChart'] ?? false) {
-                $varID = @$this->GetIDForIdent($item['Ident']);
-                if ($varID) {
-                    AC_SetLoggingStatus($archiveID, $varID, true);
+                foreach(['berlin','hermitage'] as $view){
+                    $varID=$bindings[$view][$item['Ident']]??0;
+                    if($varID&&in_array(IPS_GetVariable($varID)['VariableType'],[1,2],true))AC_SetLoggingStatus($archiveID,$varID,true);
                 }
             }
         }
 
         IPS_ApplyChanges($archiveID);
-        echo "Archive logging has been enabled for the Battery and all selected Chart variables.";
+        echo "Archive logging has been enabled for the Battery and selected Berlin/Hermitage chart variables.";
     }
 
 

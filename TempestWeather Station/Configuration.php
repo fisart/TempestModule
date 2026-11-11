@@ -18,11 +18,12 @@ trait TempestConfiguration
             if(gettype($p[$key])!==gettype($default))throw new InvalidArgumentException('Invalid type: '.$key);
             if(is_string($p[$key])&&strlen($p[$key])>131072)throw new InvalidArgumentException('Configuration text too large.');
         }
-        foreach(['SecretsInstanceID','PortalInstanceID','DocumentationInstanceID','ArchiveID'] as $key)if($p[$key]<0)throw new InvalidArgumentException('Invalid instance ID.');
+        foreach(['SecretsInstanceID','PortalInstanceID','DocumentationInstanceID','ArchiveID','HermitageRootID','ForecastVariableID'] as $key)if($p[$key]<0)throw new InvalidArgumentException('Invalid instance ID.');
         foreach(['HTMLBackgroundColor','HTMLFontColor','ChartColor'] as $key)if($p[$key]<0||$p[$key]>16777215)throw new InvalidArgumentException('Invalid colour.');
         foreach(['StationName'=>160,'ProfilePrefix'=>80] as $key=>$max)if(trim($p[$key])===''||strlen($p[$key])>$max||preg_match('/[\x00-\x1f\x7f]/',$p[$key]))throw new InvalidArgumentException('Invalid '.$key.'.');
         if(!preg_match('~^/hook/[A-Za-z0-9_-]{1,100}$~D',$p['WebhookPath']))throw new InvalidArgumentException('Use a plain local /hook/name path.');
-        if(!in_array($p['HTMLTimezone'],timezone_identifiers_list(),true)&&$p['HTMLTimezone']!=='UTC')throw new InvalidArgumentException('Unknown timezone.');
+        foreach(['HTMLTimezone','HermitageTimezone'] as $key)if(!in_array($p[$key],timezone_identifiers_list(),true)&&$p[$key]!=='UTC')throw new InvalidArgumentException('Unknown timezone.');
+        if(!in_array($p['DefaultWeatherView'],['berlin','hermitage','forecast'],true))throw new InvalidArgumentException('Unknown default weather tab.');
         foreach(['RegressionDataPoints'=>[5,500],'HTMLUpdateInterval'=>[0,3600],'HTMLChartHeight'=>[20,500],'ChartTimeframe'=>[1,168],'HTMLFontSizeValue'=>[1,20],'AuthMode'=>[0,3]] as $key=>[$min,$max])if($p[$key]<$min||$p[$key]>$max)throw new InvalidArgumentException('Out of range: '.$key);
         if(!is_numeric($p['TriggerValueSlope'])||!is_finite((float)$p['TriggerValueSlope'])||abs((float)$p['TriggerValueSlope'])>1)throw new InvalidArgumentException('Invalid regression slope.');
         $rows=json_decode($p['HTMLVariableList'],true,16,JSON_THROW_ON_ERROR);$known=$this->GetMasterMetadata();$seen=[];
@@ -45,6 +46,7 @@ trait TempestConfiguration
         if(($v['schema']??'')!=='Tempest.afprivat.v1'||($v['moduleID']??'')!==self::PRIVATE_MODULE||!is_array($v['properties']??null)||array_diff(array_keys($v),['schema','moduleID','properties']))throw new InvalidArgumentException('Unsupported Tempest configuration.');
         if(IPS_HasChanges($this->InstanceID))throw new InvalidArgumentException('Apply or discard pending Tempest edits before import.');
         $p=$this->ValidProperties($v['properties']);$p['WebEnabled']=false;$p['AllowWebAdministration']=false;
+        $this->ValidateWeatherSourceSettings($p);
         $this->WriteAttributeString('HTMLVariableListBuffer',$p['HTMLVariableList']);$this->SetBuffer('PrivateState','');
         IPS_SetConfiguration($this->InstanceID,json_encode($p,JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR));IPS_ApplyChanges($this->InstanceID);
         return 'Imported. Review the native Secrets backend and object IDs in the console, then enable web access.';
@@ -69,6 +71,7 @@ trait TempestConfiguration
         if(array_intersect(array_keys($settings),$blocked)||array_diff(array_keys($settings),array_keys($current)))throw new InvalidArgumentException('These settings are console-only.');
         $next=$this->ValidProperties(array_replace($current,$settings));$archive=$next['ArchiveID'];
         if($archive>0&&(!IPS_InstanceExists($archive)||strtoupper(IPS_GetInstance($archive)['ModuleInfo']['ModuleID']??'')!=='{43192F0B-135B-4CE7-A0A7-1475603F3060}'))throw new InvalidArgumentException('Select an installed Archive Control.');
+        $this->ValidateWeatherSourceSettings($next);
         $this->WriteAttributeString('HTMLVariableListBuffer',$next['HTMLVariableList']);IPS_SetConfiguration($this->InstanceID,json_encode($next,JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR));IPS_ApplyChanges($this->InstanceID);$this->DebugEvent('settings','Weather settings updated from protected administration.',0);return ['message'=>'Settings saved.'];
     }
 }

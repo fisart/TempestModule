@@ -71,7 +71,7 @@ trait TempestPrivateWeb
             $old=json_decode(IPS_GetProperty($portal,'AdditionalPages'),true,32,JSON_THROW_ON_ERROR);if(!is_array($old)||!array_is_list($old))throw new RuntimeException('Invalid Portal additional-pages list.');
             $next=array_values(array_filter($old,fn($r)=>($r['TargetID']??0)!==$this->InstanceID));
             if($this->ReadPropertyBoolean('WebEnabled')){
-                foreach([[$this->WeatherPath(),'Weather — ','Current weather and recorded sensor charts.','smart'],[$this->AdminPath(),'Tempest administration — ','Weather settings, diagnostics, configuration import and export.','admin']] as [$path,$name,$description,$cluster]){
+                foreach([[$this->WeatherPath(),'Weather — ','Berlin, Hermitage and Berlin forecast in one protected weather page.','smart'],[$this->AdminPath(),'Tempest administration — ','Weather settings, diagnostics, configuration import and export.','admin']] as [$path,$name,$description,$cluster]){
                     foreach($next as $row)if(($row['Hook']??'')===$path)throw new RuntimeException('Conflicting Portal page ownership.');
                     $title=$name.$this->ReadPropertyString('StationName');while(strlen($title)>160)$title=preg_replace('/.$/us','',$title);
                     $next[]=['Name'=>$title,'Description'=>$description,'Cluster'=>$cluster,'Hook'=>$path,'TargetID'=>$this->InstanceID];
@@ -98,14 +98,21 @@ trait TempestPrivateWeb
         foreach(['portal'=>['PortalInstanceID',self::PORTAL,'portal'],'documentation'=>['DocumentationInstanceID','{FBEB2EF6-8D23-49D7-A256-6D0C8D973B24}','alarm_documentation_']] as $key=>[$property,$module,$prefix])try{$id=$this->IntegrationInstance($property,$module);if(IPS_GetProperty($id,'Enabled')===true)$links[$key]=$key==='portal'?'/hook/portal':'/hook/'.$prefix.$id.'#tempest-afprivat';}catch(Throwable $e){}
         return $links;
     }
-    private function CurrentWeather(string $revision): array
+    private function CurrentWeather(string $revision, array $query=[]): array
     {
-        $p=$this->AppliedProperties();$list=json_decode($p['HTMLVariableList'],true);$values=[];
-        foreach($list as $row){if(!$row['Show'])continue;$entry=['ident'=>$row['Ident'],'label'=>$row['Label'],'row'=>$row['Row'],'col'=>$row['Col'],'chart'=>$row['ShowChart'],'value'=>null,'formatted'=>'Unavailable','updated'=>0,'status'=>'missing'];
-            try{$id=(int)@$this->GetIDForIdent($row['Ident']);if($id>0&&IPS_VariableExists($id)&&(IPS_GetObject($id)['ParentID']??0)===$this->InstanceID){$v=IPS_GetVariable($id);$value=GetValue($id);if(!is_float($value)||is_finite($value)){$entry['value']=$value;$entry['formatted']=GetValueFormatted($id);$entry['updated']=(int)($v['VariableUpdated']??0);$entry['status']=time()-$entry['updated']>600?'stale':'ok';}}}catch(Throwable $e){}$values[]=$entry;
+        $p=$this->AppliedProperties();$view=$this->WeatherView($query,$p);$values=[];$forecast=null;
+        if($view==='forecast')$forecast=$this->ForecastState($p);
+        else{
+            $bindings=$this->WeatherBindings($view,$p);
+            foreach(json_decode($p['HTMLVariableList'],true) as $row){
+                if(!$row['Show'])continue;$entry=['ident'=>$row['Ident'],'label'=>$row['Label'],'row'=>$row['Row'],'col'=>$row['Col'],'chart'=>$row['ShowChart'],'value'=>null,'formatted'=>'Unavailable','updated'=>0,'status'=>'missing'];
+                try{$id=$bindings[$row['Ident']]??0;if($id){$v=IPS_GetVariable($id);$value=GetValue($id);if(!is_float($value)||is_finite($value)){$entry['value']=$value;$entry['formatted']=GetValueFormatted($id);$entry['updated']=(int)($v['VariableUpdated']??0);$entry['status']=time()-$entry['updated']>600?'stale':'ok';}}}catch(Throwable $e){}$values[]=$entry;
+            }
         }
-        usort($values,static fn($a,$b)=>[$a['row'],$a['col']]<=>[$b['row'],$b['col']]);$hash=hash('sha256',self::Canonical([$values,$p]));
-        return ['revision'=>$hash,'changed'=>$hash!==$revision,'station'=>$p['StationName'],'enabled'=>$p['EnableHTML'],'values'=>$hash!==$revision?$values:null,'poll'=>max(2,$p['HTMLUpdateInterval']?:10),'navigation'=>$this->Navigation(),'presentation'=>array_intersect_key($p,array_flip(['HTMLBackgroundColor','HTMLFontColor','ChartColor','HTMLChartHeight','HTMLFontSizeValue','HTMLTimezone','ChartTimeframe'])),'now'=>time()];
+        usort($values,static fn($a,$b)=>[$a['row'],$a['col']]<=>[$b['row'],$b['col']]);$hash=hash('sha256',self::Canonical([$view,$values,$forecast,$p]));
+        $presentation=array_intersect_key($p,array_flip(['HTMLBackgroundColor','HTMLFontColor','ChartColor','HTMLChartHeight','HTMLFontSizeValue','HTMLTimezone','ChartTimeframe']));
+        if($view==='hermitage')$presentation['HTMLTimezone']=$p['HermitageTimezone'];
+        return ['revision'=>$hash,'changed'=>$hash!==$revision,'view'=>$view,'defaultView'=>$p['DefaultWeatherView'],'station'=>$p['StationName'],'enabled'=>$p['EnableHTML'],'values'=>$hash!==$revision?$values:null,'forecast'=>$forecast,'poll'=>max(2,$view==='forecast'?max(60,$p['HTMLUpdateInterval']):($p['HTMLUpdateInterval']?:10)),'navigation'=>$this->Navigation(),'presentation'=>$presentation,'now'=>time()];
     }
     private function AdminState(array $server,int $backend): array
     {
@@ -127,8 +134,9 @@ trait TempestPrivateWeb
     private function ChartHistory(array $query): array
     {
         $ident=$query['ident']??null;if(!is_string($ident))throw new InvalidArgumentException('Choose a configured chart.');$p=$this->AppliedProperties();$rows=json_decode($p['HTMLVariableList'],true);$match=array_values(array_filter($rows,static fn($r)=>$r['Ident']===$ident&&$r['Show']&&$r['ShowChart']));if(count($match)!==1)throw new InvalidArgumentException('Chart is not enabled for this variable.');
-        $archive=$p['ArchiveID'];$id=(int)@$this->GetIDForIdent($ident);
-        if(!$archive||!IPS_InstanceExists($archive)||strtoupper(IPS_GetInstance($archive)['ModuleInfo']['ModuleID']??'')!=='{43192F0B-135B-4CE7-A0A7-1475603F3060}'||!$id||!IPS_VariableExists($id)||(IPS_GetObject($id)['ParentID']??0)!==$this->InstanceID||!in_array(IPS_GetVariable($id)['VariableType'],[1,2],true)||!AC_GetLoggingStatus($archive,$id)||AC_GetAggregationType($archive,$id)!==0)throw new InvalidArgumentException('Enable standard logging for this selected weather variable in Archive Control.');
+        $view=$this->WeatherView($query,$p);if($view==='forecast')throw new InvalidArgumentException('The forecast is an image, not an observation chart.');
+        $archive=$p['ArchiveID'];$id=$this->WeatherBindings($view,$p)[$ident]??0;
+        if(!$archive||!IPS_InstanceExists($archive)||strtoupper(IPS_GetInstance($archive)['ModuleInfo']['ModuleID']??'')!=='{43192F0B-135B-4CE7-A0A7-1475603F3060}'||!$id||!IPS_VariableExists($id)||!in_array(IPS_GetVariable($id)['VariableType'],[1,2],true)||!AC_GetLoggingStatus($archive,$id)||AC_GetAggregationType($archive,$id)!==0)throw new InvalidArgumentException('Enable standard logging for this selected weather variable in Archive Control.');
         $key=hash('sha256',self::Canonical([$archive,$id,$p['ChartTimeframe']]));$cache=json_decode($this->GetBuffer('Chart.'.$id),true)??[];if(($cache['key']??'')===$key&&time()-($cache['time']??0)<300)return $cache['data'];
         $end=time();$from=$end-$p['ChartTimeframe']*3600;$rows=AC_GetAggregatedValues($archive,$id,0,$from,$end,200);if(!is_array($rows))throw new RuntimeException('Archive read failed.');$points=[];$seen=[];
         foreach(array_slice($rows,0,200) as $row){$t=$row['TimeStamp']??null;$v=$row['Avg']??null;if(!is_int($t)||$t<$from||$t>$end||isset($seen[$t])||!is_numeric($v)||!is_finite((float)$v))continue;$seen[$t]=true;$points[]=[$t,(float)$v];}
@@ -170,7 +178,12 @@ trait TempestPrivateWeb
                 }return $reply(400,['error'=>'Unknown administration action.']);
                 }finally{IPS_SemaphoreLeave('TMT.Configuration.'.$this->InstanceID);}
             }
-            if($action==='data')return $reply(200,$this->CurrentWeather(is_string($query['revision']??null)?$query['revision']:''));
+            if($action==='data')return $reply(200,$this->CurrentWeather(is_string($query['revision']??null)?$query['revision']:'',$query));
+            if($action==='forecast-image'){
+                $image=$this->ForecastImage($this->AppliedProperties());$headers['Content-Type']=$image['mime'];
+                $headers['Content-Security-Policy']="sandbox; default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; frame-ancestors 'none'";
+                return ['status'=>200,'headers'=>$headers,'body'=>$image['body']];
+            }
             if($action==='history')return $reply(200,$this->ChartHistory($query));
             if($admin&&$action==='admin-state')return $reply(200,$this->AdminState($server,$backend));
             if($admin&&$action==='export'){$r=$reply(200,[]);$r['body']=$this->ExportConfig();$r['headers']['Content-Disposition']='attachment; filename="Tempest-'.$this->InstanceID.'.json"';return $r;}

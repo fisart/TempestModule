@@ -68,6 +68,53 @@
       ]
     },
     {
+      "type": "ExpansionPanel",
+      "caption": "Weather tabs / local sources",
+      "items": [
+        {
+          "type": "Label",
+          "caption": "Berlin is this instance. Hermitage uses direct numeric children of the local mirror category; Berlin forecast uses the existing downloaded image string. No remote requests are added."
+        },
+        {
+          "type": "SelectCategory",
+          "name": "HermitageRootID",
+          "caption": "Hermitage mirror category"
+        },
+        {
+          "type": "SelectVariable",
+          "name": "ForecastVariableID",
+          "caption": "Berlin forecast image (string variable)",
+          "validVariableTypes": [
+            3
+          ]
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "HermitageTimezone",
+          "caption": "Hermitage timezone"
+        },
+        {
+          "type": "Select",
+          "name": "DefaultWeatherView",
+          "caption": "Default weather tab",
+          "options": [
+            {
+              "caption": "Berlin",
+              "value": "berlin"
+            },
+            {
+              "caption": "Hermitage",
+              "value": "hermitage"
+            },
+            {
+              "caption": "Berlin forecast",
+              "value": "forecast"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "type": "Label",
       "caption": "Open the URLs shown in the child WebLinks variable using the native Secrets HTTPS address."
     },

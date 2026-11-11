@@ -1,6 +1,6 @@
 # Weatherflow Tempest — afprivat
 
-Version **4.9.2, build 4**. This branch adds native Secrets passkey protection, separate weather and administration pages, Portal registration, debug output and module-owned configuration protection. It retains the Tempest UDP receiver, existing variable identifiers, library/module GUIDs, TMT prefix and archive backfill behavior.
+Version **4.10.0, build 5**. This branch adds native Secrets passkey protection, separate weather and administration pages, Portal registration, debug output and module-owned configuration protection. It retains the Tempest UDP receiver, existing variable identifiers, library/module GUIDs, TMT prefix and archive backfill behavior.
 
 ## Install and open
 
@@ -8,15 +8,31 @@ Version **4.9.2, build 4**. This branch adds native Secrets passkey protection, 
 2. Select the **new native Secrets backend** under General Settings → Native Secrets backend. With exactly one enabled, correctly linked backend/frontend pair, selection is automatic. The backend must provide `SECB_IsNativePortalAuthenticated` and `SECB_GetNativePortalLoginURL`. Its frontend must point back to that backend with the same trusted AdminOrigin. A migrated legacy adapter can resolve its ready native-only replacement; old vault login and Basic authentication are never used.
 3. Enable protected web pages and Apply. Hook/Portal registration runs after Symcon is ready. Open the paths in the child **WebLinks** variable using the native Secrets HTTPS address. Anonymous page requests go to the native frontend passkey login; all API and chart requests recheck the native session and transport. Approved backup-address validation is delegated to the native backend.
 4. Portal receives **Smart Home → Weather — [station]** and **Administration → Tempest administration — [station]** through Additional Pages. Enable “Include administration” in Portal to see its administration group. If several Portal or Dokumentation instances exist, select the intended instance in the Tempest form. Pending Portal edits and conflicting webhook ownership are preserved; resolve the status message and use **Register pages and Portal links** again.
-5. Update Dokumentation to **1.34, build 66**. Its **Smart Home → Weatherflow Tempest — afprivat** guide covers installation, permissions, display, diagnostics and restore. Both Tempest pages include Portal and Dokumentation links when those instances are available.
+5. Update Dokumentation to the latest **main** release. Its **Smart Home → Weatherflow Tempest — afprivat** guide covers installation, permissions, display, diagnostics and restore. Both Tempest pages include Portal and Dokumentation links when those instances are available.
+
+## Three weather tabs
+
+The **Berlin Tempest instance 58583** manages the combined page at the existing `/hook/tempest` path. Select **Berlin**, **Hermitage** or **Berlin forecast**. Tabs work on a tablet/phone and support keyboard navigation. Only the active tab polls; hidden station histories and the forecast image are not preloaded. The last selection is remembered per browser/page. A URL fragment overrides that choice: `/hook/tempest#berlin`, `/hook/tempest#hermitage`, `/hook/tempest#forecast`. These URLs can be used in IPSView; the native passkey session is still required.
+
+| Tab | Local source | Timezone |
+| --- | --- | --- |
+| Berlin | This Tempest instance's existing variables | HTMLTimezone (Berlin installation: Europe/Berlin) |
+| Hermitage | Direct numeric children of mirror category **21954**, matched uniquely to Tempest observation names | HermitageTimezone (America/New_York) |
+| Berlin forecast | Embedded downloaded image in string variable **22491** | Berlin display timezone; chart retains its printed forecast times |
+
+The two source IDs are defaults specifically for existing Berlin instance **58583**. Other instances start with both optional sources unconfigured. Change them in **Weather tabs / local sources** in the Symcon instance or **Weather tabs & sources** on the protected administration page. DefaultWeatherView chooses the initial tab when there is no deep link or saved preference. Existing configuration exports remain importable; new exports include the source selections and timezone/default-tab settings.
+
+Berlin and Hermitage share the selected observation layout. Hermitage reads the existing local RemoteSync copy: no second receiver or remote HTTP weather call is added. Missing or duplicate names remain unavailable, and ownership is rechecked before using cached chart history. Histories come from the selected local Archive Control and need existing standard logging for each mirror variable; **Enable selected archive logging** explicitly enables future recording for both stations. It does not create missing history or change RemoteSync.
+
+The forecast tab shows **Berlin-Dahlem · DWD / profiwetter.ch**, its local source update time and a stale warning after 24 hours. **Enlarge forecast** opens a large view with zoom/pan scrolling. Its compact metadata is checked at least 60 seconds apart, and the image reloads only when its content changes. The existing forecast downloader continues unchanged. Only embedded SVG/PNG/JPEG/GIF images are accepted; source HTML is never executed and external image URLs are not downloaded. Image requests require the same native session; SVG responses use an isolated, script-free policy and reject active/external content.
 
 ## Weather page
 
 The responsive, self-contained page displays the selected weather variables with their existing Symcon profile formatting/units, update time and a stale indication after ten minutes without an update. Dashboard rows are ordered by configured row and column. Missing values are explicitly unavailable. Enable charts for selected variables and select Archive Control. Charts use existing standard logged data; the administration logging button enables future recording explicitly, rather than inventing historical observations.
 
-Each selected chart has a small plot and an expandable chart with pointer/touch value tooltips. Data are **hourly means**, with a selectable 1–168-hour window and at most 200 records per chart. Both server and browser cache history for five minutes. Arbitrary variable IDs cannot be requested; only enabled, selected, locally owned numeric variables with standard archive aggregation are eligible.
+Each selected chart has a small plot and an expandable chart with pointer/touch value tooltips. Data are **hourly means**, with a selectable 1–168-hour window and at most 200 records per chart. Both server and browser cache history for five minutes. Arbitrary variable IDs cannot be requested; only enabled, selected numeric variables owned by this instance or the configured local mirror category with standard archive aggregation are eligible.
 
-The browser polls compact JSON while visible. Default interval is ten seconds; a configured nonzero HTMLUpdateInterval uses at least two seconds on the page. Unchanged replies omit observation values. No full HTML is transferred on refresh. Requests have a generous 90-second timeout, never retry writes automatically, and failed weather reads back off to 30 seconds. Charts refresh independently of current values. No third-party libraries or CDN calls are needed by the two new pages. The existing HTMLBox Dashboard remains available and retains its historical Highcharts dependencies.
+The browser polls compact JSON while visible. Default interval is ten seconds; a configured nonzero HTMLUpdateInterval uses at least two seconds on the page. Unchanged replies omit observation values. No full HTML is transferred on refresh. Requests have a generous 90-second timeout, never retry writes automatically, and failed weather reads back off to 30 seconds. Chart history is cached separately from current values and refreshed when visible tiles are redrawn after cache expiry. No third-party libraries or CDN calls are needed by the two new pages. The existing HTMLBox Dashboard remains available and retains its historical Highcharts dependencies.
 
 ## Administration page and permissions
 
@@ -63,3 +79,9 @@ Portal navigation uses `/hook/portal`. Update/apply Portal 1.7 first; it also re
 Use the [central canonical checksum contract and release gate](https://github.com/fisart/Symcon-Backup-Module/blob/main/.docs/configuration-backup-requirements.md#canonical-checksums-and-release-gate--9-november-2026) for all backup/export changes. The canonical flags are `JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR`; preserve numeric types in native, web and protocol JSON as well as hashes. The validator hashes the exact received payload, before import normalization.
 
 Before publication run `tests/private-web.php` against an independently sourced `MCBBackupProtocol` and `MCBEngine` using `TEMPEST_BACKUP_PROTOCOL` and `TEMPEST_BACKUP_ENGINE`. Use whole-number float fixtures and ensure the Symcon configuration stub preserves their types. Confirm real source mismatches still fail. Testing the export against Tempest’s own canonical helper alone cannot catch incompatible encoding. The 4.9.2 integration run passed 85 assertions; passing schema validation does not claim a live restore.
+
+## Release evidence · 11 November 2026
+
+4.10.0 is developed from afprivat 49c3766 and includes main 6917ede in its ancestry, preserving the earlier native Secrets, administration, Portal `/hook/portal`, UDP/backfill and 4.9.2 checksum fixes. The prior Portal helper/test changes were checked before combining histories.
+
+The local integration run passed **115 assertions** including the actual stored Matplotlib SVG, source isolation and negative SVG cases. It used the unmodified independent Configuration Backup `MCBBackupProtocol`/`MCBEngine` at **d9b4493c4e10cf5fd87a2afff394cd06023da712**. It checked whole-number floats, 0.0 and nested canonical vectors, native/web exports, source mismatches, wrong module/malformed envelope/payload hash rejection and read-only validation. The actual downloaded image is a local-only test fixture and is not published in the repository. Browser CI covers desktop/mobile, tab polling isolation, mirror charts, forecast image caching/enlargement, remembered/deep-linked selection, late-response races and existing administration/authentication behavior. Live passkey login, update installation and archive availability require verification on the Symcon server; no live restore was performed.
